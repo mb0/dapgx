@@ -10,15 +10,14 @@ import (
 	"xelf.org/daql/dom"
 	"xelf.org/xelf/bfr"
 	"xelf.org/xelf/cor"
-	"xelf.org/xelf/exp"
 	"xelf.org/xelf/knd"
 	"xelf.org/xelf/typ"
 )
 
-func WriteSchemaFile(fname string, prog *exp.Prog, p *dom.Project, s *dom.Schema) error {
+func WriteSchemaFile(fname string, p *dom.Project, s *dom.Schema) error {
 	b := bfr.Get()
 	defer bfr.Put(b)
-	w := dapgx.NewWriter(b, p, prog, nil)
+	w := dapgx.NewWriter(b, p, nil, nil)
 	w.Project = p
 	w.WriteString(w.Header)
 	w.WriteString("BEGIN;\n\n")
@@ -37,12 +36,25 @@ func WriteSchemaFile(fname string, prog *exp.Prog, p *dom.Project, s *dom.Schema
 }
 
 func WriteSchema(w *dapgx.Writer, s *dom.Schema) (err error) {
-	w.WriteString("CREATE SCHEMA ")
-	w.WriteString(s.Name)
-	w.WriteString(";\n\n")
+	// collect models first, we do not want to generate empty schemas
+	ms := make([]*dom.Model, 0, len(s.Models))
 	for _, m := range s.Models {
 		switch m.Kind.Kind {
-		case knd.Bits:
+		case knd.Enum:
+			ms = append(ms, m)
+		case knd.Obj:
+			if hasFlag(m.Extra, "backup") || hasFlag(m.Extra, "topic") {
+				ms = append(ms, m)
+			}
+		}
+	}
+	if len(ms) == 0 {
+		w.Fmt("-- schema %s has no enums or tables\n\n", s.Name)
+		return nil
+	}
+	w.Fmt("CREATE SCHEMA %s;\n\n", s.Name)
+	for _, m := range ms {
+		switch m.Kind.Kind {
 		case knd.Enum:
 			err = WriteEnum(w, m)
 		default:
