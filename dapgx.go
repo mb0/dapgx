@@ -17,9 +17,11 @@ type C interface {
 	Query(Ctx, string, ...interface{}) (pgx.Rows, error)
 	QueryRow(Ctx, string, ...interface{}) pgx.Row
 	Exec(Ctx, string, ...interface{}) (pgconn.CommandTag, error)
-	Prepare(Ctx, string, string) (*pgconn.StatementDescription, error)
 	CopyFrom(Ctx, pgx.Identifier, []string, pgx.CopyFromSource) (int64, error)
 }
+
+var _ C = (*pgxpool.Pool)(nil)
+var _ C = (*pgx.Conn)(nil)
 
 type DB interface {
 	Begin(Ctx) (pgx.Tx, error)
