@@ -103,7 +103,7 @@ func TestGenQuery(t *testing.T) {
 		}
 		var res []string
 		for _, q := range batch.List {
-			qs, _, err := genQuery(c, q)
+			qs, _, err := genQuery(b.Project, c, q)
 			if err != nil {
 				t.Errorf("gen queries %s: %v", test.raw, err)
 				continue

@@ -61,7 +61,7 @@ func (b *Backend) Exec(p *exp.Prog, j *qry.Job) (lit.Val, error) {
 	return j.Val, nil
 }
 func (b *Backend) execQuery(p *exp.Prog, q *Query) error {
-	qs, ps, err := genQuery(p, q)
+	qs, ps, err := genQuery(b.Project, p, q)
 	if err != nil {
 		return err
 	}

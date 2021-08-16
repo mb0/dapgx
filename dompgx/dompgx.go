@@ -26,7 +26,7 @@ func CreateProject(db *pgxpool.Pool, p *dom.Project) error {
 				return err
 			}
 			for _, m := range s.Models {
-				err = CreateModel(tx, s, m)
+				err = CreateModel(tx, p, s, m)
 				if err != nil {
 					return err
 				}
@@ -42,26 +42,35 @@ func DropProject(db *pgxpool.Pool, p *dom.Project) error {
 	})
 }
 
-func CreateModel(tx dapgx.C, s *dom.Schema, m *dom.Model) error {
+func CreateModel(tx dapgx.C, p *dom.Project, s *dom.Schema, m *dom.Model) error {
 	switch m.Kind.Kind {
 	case knd.Bits:
 		return nil
 	case knd.Enum:
-		return createModel(tx, m, (*genpg.Writer).WriteEnum)
+		return createModel(tx, p, m, (*genpg.Writer).WriteEnum)
 	case knd.Obj:
-		err := createModel(tx, m, (*genpg.Writer).WriteTable)
-		if err != nil {
-			return err
+		if hasFlag(m.Extra, "backup") || hasFlag(m.Extra, "topic") {
+			err := createModel(tx, p, m, (*genpg.Writer).WriteTable)
+			if err != nil {
+				return err
+			}
 		}
 		// TODO indices
+		return nil
+	case knd.Func:
 		return nil
 	}
 	return fmt.Errorf("unexpected model kind %s", m.Kind)
 }
 
-func createModel(tx dapgx.C, m *dom.Model, f func(*genpg.Writer, *dom.Model) error) error {
+func hasFlag(d *lit.Dict, key string) bool {
+	v, err := d.Key(key)
+	return err == nil && !v.Zero()
+}
+
+func createModel(tx dapgx.C, p *dom.Project, m *dom.Model, f func(*genpg.Writer, *dom.Model) error) error {
 	var b strings.Builder
-	w := genpg.NewWriter(&b, nil, genpg.ExpEnv{})
+	w := genpg.NewWriter(&b, p, nil, genpg.ExpEnv{})
 	err := f(w, m)
 	if err != nil {
 		return err

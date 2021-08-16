@@ -4,15 +4,16 @@ import (
 	"fmt"
 	"strings"
 
+	"xelf.org/daql/dom"
 	"xelf.org/daql/gen/genpg"
 	"xelf.org/daql/qry"
 	"xelf.org/xelf/exp"
 	"xelf.org/xelf/lit"
 )
 
-func genQuery(p *exp.Prog, q *Query) (string, []genpg.Param, error) {
+func genQuery(pr *dom.Project, p *exp.Prog, q *Query) (string, []genpg.Param, error) {
 	b := &strings.Builder{}
-	w := genpg.NewWriter(b, p, &jobTranslator{q.Alias})
+	w := genpg.NewWriter(b, pr, p, &jobTranslator{q.Alias})
 	err := genSelect(w, p, q.Alias, q)
 	if err != nil {
 		return "", nil, err
