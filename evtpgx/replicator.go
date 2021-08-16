@@ -33,7 +33,7 @@ type Replicator struct {
 }
 
 func NewReplicator(p *Publisher, rels ...string) (evt.LocalPublisher, error) {
-	local, err := queryLocal(p.DB)
+	local, err := p.queryLocal(p.DB)
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +105,7 @@ func (r *Replicator) PublishLocal(data evt.Trans) (lrev time.Time, evs []*evt.Ev
 		err = c.QueryRow(dapgx.BG, `INSERT INTO evt.trans
 			(base, rev, created, arrived, usr, extra, acts)
 			values ($1, $2, $3, $4, $5, $6, $7) returning id`,
-			t.Base, t.Rev, t.Created, t.Arrived, t.Usr, toRaw(t.Extra), t.Acts,
+			t.Base, t.Rev, t.Created, t.Arrived, t.Usr, r.arg(t.Extra), t.Acts,
 		).Scan(&t.ID)
 		if err != nil {
 			return err
@@ -148,7 +148,7 @@ func reviseActions(c dapgx.C, t *evt.Trans) ([]*evt.Event, error) {
 	return evs, nil
 }
 
-func queryLocal(c dapgx.C) ([]*evt.Trans, error) {
+func (p *publisher) queryLocal(c dapgx.C) ([]*evt.Trans, error) {
 	rows, err := c.Query(dapgx.BG, `SELECT id, base, rev, created, arrived, usr, extra, acts
 		FROM evt.trans ORDER BY id`)
 	if err != nil {
@@ -158,7 +158,7 @@ func queryLocal(c dapgx.C) ([]*evt.Trans, error) {
 	var res []*evt.Trans
 	for rows.Next() {
 		var t evt.Trans
-		err = rows.Scan(&t.ID, &t.Base, &t.Rev, &t.Created, &t.Arrived, &t.Usr, &t.Extra, &t.Acts)
+		err = rows.Scan(&t.ID, &t.Base, &t.Rev, &t.Created, &t.Arrived, &t.Usr, p.ptr(&t.Extra), &t.Acts)
 		if err != nil {
 			return nil, fmt.Errorf("scan local trans: %w", err)
 		}

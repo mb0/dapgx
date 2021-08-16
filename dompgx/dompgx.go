@@ -8,7 +8,6 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 	"xelf.org/dapgx"
 	"xelf.org/daql/dom"
-	"xelf.org/daql/gen/genpg"
 	"xelf.org/xelf/cor"
 	"xelf.org/xelf/knd"
 	"xelf.org/xelf/lit"
@@ -47,10 +46,10 @@ func CreateModel(tx dapgx.C, p *dom.Project, s *dom.Schema, m *dom.Model) error 
 	case knd.Bits:
 		return nil
 	case knd.Enum:
-		return createModel(tx, p, m, (*genpg.Writer).WriteEnum)
+		return createModel(tx, p, m, WriteEnum)
 	case knd.Obj:
 		if hasFlag(m.Extra, "backup") || hasFlag(m.Extra, "topic") {
-			err := createModel(tx, p, m, (*genpg.Writer).WriteTable)
+			err := createModel(tx, p, m, WriteTable)
 			if err != nil {
 				return err
 			}
@@ -68,9 +67,9 @@ func hasFlag(d *lit.Dict, key string) bool {
 	return err == nil && !v.Zero()
 }
 
-func createModel(tx dapgx.C, p *dom.Project, m *dom.Model, f func(*genpg.Writer, *dom.Model) error) error {
+func createModel(tx dapgx.C, p *dom.Project, m *dom.Model, f func(*dapgx.Writer, *dom.Model) error) error {
 	var b strings.Builder
-	w := genpg.NewWriter(&b, p, nil, genpg.ExpEnv{})
+	w := dapgx.NewWriter(&b, p, nil, dapgx.ExpEnv{})
 	err := f(w, m)
 	if err != nil {
 		return err

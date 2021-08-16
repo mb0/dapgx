@@ -70,7 +70,7 @@ func (b *Backend) execQuery(p *exp.Prog, q *Query) error {
 		args = make([]interface{}, 0, len(ps))
 		for _, p := range ps {
 			if p.Value != nil {
-				args = append(args, p.Value)
+				args = append(args, dapgx.WrapArg(p.Value))
 				continue
 			}
 			return fmt.Errorf("unexpected external param %+v", p)
@@ -94,7 +94,7 @@ func (b *Backend) execQuery(p *exp.Prog, q *Query) error {
 	q.Val = mut
 	switch {
 	case q.Kind&KindScalar != 0:
-		return b.scanScalar(q, mut, rows)
+		return b.scanScalar(p, q, mut, rows)
 	case q.Kind&KindOne != 0:
 		return b.scanOne(p, q, mut, rows)
 	case q.Kind&KindMany != 0:
@@ -103,11 +103,11 @@ func (b *Backend) execQuery(p *exp.Prog, q *Query) error {
 	return fmt.Errorf("unexpected query kind for %s", q.Ref)
 }
 
-func (b *Backend) scanScalar(q *Query, mut lit.Mut, rows pgx.Rows) error {
+func (b *Backend) scanScalar(p *exp.Prog, q *Query, mut lit.Mut, rows pgx.Rows) error {
 	if !rows.Next() {
 		return fmt.Errorf("no result for query %s", q.Ref)
 	}
-	err := rows.Scan(mut.Ptr())
+	err := rows.Scan(dapgx.WrapPtr(p.Reg, mut.Ptr()))
 	if err != nil {
 		return fmt.Errorf("scan row for query %s: %w", q.Ref, err)
 	}
@@ -182,13 +182,13 @@ func (b *Backend) scanRow(p *exp.Prog, q *Query, mut lit.Mut, rows pgx.Rows) (er
 				log.Printf("scalar join mut %s %T", v, v)
 			}
 		}
-		p, ok := v.(lit.Mut)
+		mut, ok := v.(lit.Mut)
 		if !ok {
 			return fmt.Errorf("scan %s expect proxy got %T from %s", q.Ref, v, mut.Type())
 		}
 		o, _ := v.(*lit.OptMut)
 		opts = append(opts, o)
-		args = append(args, p.Ptr())
+		args = append(args, dapgx.WrapPtr(p.Reg, mut.Ptr()))
 	}
 	err = rows.Scan(args...)
 	if err != nil {

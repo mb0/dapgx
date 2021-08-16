@@ -10,10 +10,11 @@ import (
 	"xelf.org/dapgx/qrypgx"
 	"xelf.org/daql/dom"
 	"xelf.org/daql/evt"
+	"xelf.org/xelf/lit"
 )
 
-func NewLedger(db *pgxpool.Pool, pr *dom.Project) (evt.Ledger, error) {
-	l, err := newLedger(db, pr)
+func NewLedger(db *pgxpool.Pool, pr *dom.Project, reg *lit.Reg) (evt.Ledger, error) {
+	l, err := newLedger(db, pr, reg)
 	if err != nil {
 		return nil, err
 	}
@@ -22,12 +23,13 @@ func NewLedger(db *pgxpool.Pool, pr *dom.Project) (evt.Ledger, error) {
 
 type ledger struct {
 	*qrypgx.Backend
+	Reg *lit.Reg
 	rev time.Time
 }
 
-func newLedger(db *pgxpool.Pool, pr *dom.Project) (ledger, error) {
+func newLedger(db *pgxpool.Pool, pr *dom.Project, reg *lit.Reg) (ledger, error) {
 	rev, err := queryMaxRev(db)
-	return ledger{qrypgx.New(db, pr), rev}, err
+	return ledger{qrypgx.New(db, pr), reg, rev}, err
 }
 
 func (l *ledger) Rev() time.Time        { return l.rev }
@@ -35,13 +37,16 @@ func (l *ledger) Project() *dom.Project { return l.Backend.Project }
 
 func (l *ledger) Events(rev time.Time, tops ...string) ([]*evt.Event, error) {
 	if rev.IsZero() && len(tops) == 0 {
-		return queryEvents(l.DB, "")
+		return l.queryEvents(l.DB, "")
 	}
 	if len(tops) == 0 {
-		return queryEvents(l.DB, "WHERE rev > $1", rev)
+		return l.queryEvents(l.DB, "WHERE rev > $1", rev)
 	}
-	return queryEvents(l.DB, "WHERE rev > $1 AND top in $2", rev, tops)
+	return l.queryEvents(l.DB, "WHERE rev > $1 AND top in $2", rev, tops)
 }
+
+func (l *ledger) arg(arg interface{}) interface{} { return dapgx.WrapArg(arg) }
+func (l *ledger) ptr(arg interface{}) interface{} { return dapgx.WrapPtr(l.Reg, arg) }
 
 func queryMaxRev(c dapgx.C) (time.Time, error) {
 	rev := time.Time{}
@@ -51,7 +56,7 @@ func queryMaxRev(c dapgx.C) (time.Time, error) {
 	}
 	return rev, nil
 }
-func queryEvents(c dapgx.C, whr string, args ...interface{}) ([]*evt.Event, error) {
+func (l *ledger) queryEvents(c dapgx.C, whr string, args ...interface{}) ([]*evt.Event, error) {
 	rows, err := c.Query(dapgx.BG, fmt.Sprintf("SELECT id, rev, top, key, cmd, arg "+
 		"FROM evt.event %s ORDER BY id", whr), args...)
 	if err != nil {
@@ -61,7 +66,7 @@ func queryEvents(c dapgx.C, whr string, args ...interface{}) ([]*evt.Event, erro
 	var res []*evt.Event
 	for rows.Next() {
 		var e evt.Event
-		err = rows.Scan(&e.ID, &e.Rev, &e.Top, &e.Key, &e.Cmd, &e.Arg)
+		err = rows.Scan(&e.ID, &e.Rev, &e.Top, &e.Key, &e.Cmd, l.ptr(&e.Arg))
 		if err != nil {
 			return nil, fmt.Errorf("scan event: %w", err)
 		}

@@ -21,7 +21,6 @@ type Publisher struct {
 type publisher struct {
 	ledger
 	insTop map[string]string
-	reg    *lit.Reg
 	apply  applyFunc
 }
 
@@ -32,11 +31,11 @@ func NewStatefulPublisher(db *pgxpool.Pool, pr *dom.Project, reg *lit.Reg) (*Pub
 	return newPublisher(db, pr, reg, applyAndInsertEvents)
 }
 func newPublisher(db *pgxpool.Pool, pr *dom.Project, reg *lit.Reg, a applyFunc) (*Publisher, error) {
-	l, err := newLedger(db, pr)
+	l, err := newLedger(db, pr, reg)
 	if err != nil {
 		return nil, err
 	}
-	return &Publisher{publisher{ledger: l, reg: reg, apply: a}}, nil
+	return &Publisher{publisher{ledger: l, apply: a}}, nil
 }
 
 func (p *Publisher) Publish(t evt.Trans) (time.Time, []*evt.Event, error) {
@@ -66,14 +65,14 @@ func (p *Publisher) Publish(t evt.Trans) (time.Time, []*evt.Event, error) {
 	err := dapgx.WithTx(p.DB, func(c dapgx.C) error {
 		cur, err := queryMaxRev(c)
 		if err != nil {
-			return err
+			return fmt.Errorf("query max rev: %w", err)
 		}
 		if !cur.Equal(p.rev) {
-			return fmt.Errorf("sanity check publish leger revision out of sync")
+			return fmt.Errorf("sanity check publish ledger revision out of sync")
 		}
 		if check && len(keys) > 0 {
 			// query events with affected keys since base revision
-			diff, err := queryEvents(c, "WHERE rev > $1 AND key IN $2", t.Base, keys)
+			diff, err := p.queryEvents(c, "WHERE rev > $1 AND key IN $2", t.Base, keys)
 			if err != nil {
 				return err
 			}
@@ -86,7 +85,7 @@ func (p *Publisher) Publish(t evt.Trans) (time.Time, []*evt.Event, error) {
 		if err != nil {
 			return err
 		}
-		return insertAudit(c, rev, t.Audit)
+		return p.insertAudit(c, rev, t.Audit)
 	})
 	if err != nil {
 		return p.rev, nil, err
@@ -95,20 +94,16 @@ func (p *Publisher) Publish(t evt.Trans) (time.Time, []*evt.Event, error) {
 	return p.rev, evs, nil
 }
 
-func insertAudit(c dapgx.C, rev time.Time, d evt.Audit) error {
+func (p *publisher) insertAudit(c dapgx.C, rev time.Time, d evt.Audit) error {
 	_, err := c.Exec(dapgx.BG, `INSERT INTO evt.audit
 		(rev, created, arrived, usr, extra) VALUES
 		($1, $2, $3, $4, $5)`,
-		rev, d.Created, d.Arrived, d.Usr, toRaw(d.Extra),
+		rev, d.Created, d.Arrived, d.Usr, p.arg(d.Extra),
 	)
-	return err
-}
-
-func toRaw(d *lit.Dict) (raw []byte) {
-	if d != nil {
-		raw, _ = d.MarshalJSON()
+	if err != nil {
+		return fmt.Errorf("insert audit: %w", err)
 	}
-	return
+	return nil
 }
 
 func insertEvents(p *publisher, c dapgx.C, evs []*evt.Event) error {
@@ -116,10 +111,10 @@ func insertEvents(p *publisher, c dapgx.C, evs []*evt.Event) error {
 		err := c.QueryRow(dapgx.BG, `INSERT INTO evt.event
 			(rev, top, key, cmd, arg) VALUES
 			($1, $2, $3, $4, $5) RETURNING id`,
-			ev.Rev, ev.Top, ev.Key, ev.Cmd, toRaw(ev.Arg),
+			ev.Rev, ev.Top, ev.Key, ev.Cmd, p.arg(ev.Arg),
 		).Scan(&ev.ID)
 		if err != nil {
-			return err
+			return fmt.Errorf("insert events: %w", err)
 		}
 	}
 	return nil
@@ -142,7 +137,8 @@ func applyEvent(p *publisher, c dapgx.C, ev *evt.Event) (err error) {
 	}
 	switch ev.Cmd {
 	case evt.CmdDel:
-		_, err = c.Exec(dapgx.BG, fmt.Sprintf("DELETE FROM %s WHERE id = $1", m.Qualified()), ev.Key)
+		stmt := fmt.Sprintf("DELETE FROM %s WHERE id = $1", m.Qualified())
+		_, err = c.Exec(dapgx.BG, stmt, ev.Key)
 	case evt.CmdNew:
 		qry := p.insTop[ev.Top]
 		if qry == "" {
@@ -152,13 +148,13 @@ func applyEvent(p *publisher, c dapgx.C, ev *evt.Event) (err error) {
 			}
 			p.insTop[ev.Top] = qry
 		}
-		args, err := insertArgs(m, ev)
+		args, err := p.insertArgs(m, ev)
 		if err != nil {
 			return err
 		}
 		_, err = c.Exec(dapgx.BG, qry, args...)
 	case evt.CmdMod:
-		qry, args, err := updateObj(m, ev)
+		qry, args, err := p.updateObj(m, ev)
 		if err != nil {
 			return err
 		}
@@ -193,7 +189,7 @@ func insertObj(m *dom.Model) string {
 	return b.String()
 }
 
-func insertArgs(m *dom.Model, ev *evt.Event) ([]interface{}, error) {
+func (p *publisher) insertArgs(m *dom.Model, ev *evt.Event) ([]interface{}, error) {
 	args := make([]interface{}, 0, len(m.Elems))
 	for _, f := range m.Elems {
 		k := f.Key()
@@ -206,14 +202,13 @@ func insertArgs(m *dom.Model, ev *evt.Event) ([]interface{}, error) {
 			if err != nil {
 				return nil, err
 			}
-			// TODO test to see if this works without conversions
-			args = append(args, v.Value())
+			args = append(args, p.arg(v))
 		}
 	}
 	return args, nil
 }
 
-func updateObj(m *dom.Model, ev *evt.Event) (string, []interface{}, error) {
+func (p *publisher) updateObj(m *dom.Model, ev *evt.Event) (string, []interface{}, error) {
 	args := make([]interface{}, 0, ev.Arg.Len()+1)
 	args = append(args, ev.Key)
 	var b strings.Builder
@@ -236,7 +231,7 @@ func updateObj(m *dom.Model, ev *evt.Event) (string, []interface{}, error) {
 			if val.Zero() {
 				continue
 			}
-			arg = val.Value()
+			arg = p.arg(val)
 		}
 		if len(args) > 1 {
 			b.WriteString(", ")

@@ -4,16 +4,16 @@ import (
 	"fmt"
 	"strings"
 
+	"xelf.org/dapgx"
 	"xelf.org/daql/dom"
-	"xelf.org/daql/gen/genpg"
 	"xelf.org/daql/qry"
 	"xelf.org/xelf/exp"
 	"xelf.org/xelf/lit"
 )
 
-func genQuery(pr *dom.Project, p *exp.Prog, q *Query) (string, []genpg.Param, error) {
+func genQuery(pr *dom.Project, p *exp.Prog, q *Query) (string, []dapgx.Param, error) {
 	b := &strings.Builder{}
-	w := genpg.NewWriter(b, pr, p, &jobTranslator{q.Alias})
+	w := dapgx.NewWriter(b, pr, p, &jobTranslator{q.Alias})
 	err := genSelect(w, p, q.Alias, q)
 	if err != nil {
 		return "", nil, err
@@ -21,7 +21,7 @@ func genQuery(pr *dom.Project, p *exp.Prog, q *Query) (string, []genpg.Param, er
 	return b.String(), w.Params, nil
 }
 
-func genSelect(w *genpg.Writer, p *exp.Prog, alias Alias, q *Query) error {
+func genSelect(w *dapgx.Writer, p *exp.Prog, alias Alias, q *Query) error {
 	w.WriteString("SELECT ")
 	var suf string
 	if q.Kind&KindCount != 0 {
@@ -32,7 +32,7 @@ func genSelect(w *genpg.Writer, p *exp.Prog, alias Alias, q *Query) error {
 		}
 	} else if q.Kind&KindScalar != 0 {
 		for _, c := range q.Cols {
-			err := w.WriteExp(c.Job, c.Exp)
+			err := dapgx.WriteExp(w, c.Job, c.Exp)
 			if err != nil {
 				return err
 			}
@@ -51,7 +51,7 @@ func genSelect(w *genpg.Writer, p *exp.Prog, alias Alias, q *Query) error {
 						sca := c.Sub.Cols[0]
 						if c.Sub.Kind&KindMany != 0 {
 							w.WriteString("SELECT jsonb_agg(")
-							err := w.WriteExp(c.Job, sca.Exp)
+							err := dapgx.WriteExp(w, c.Job, sca.Exp)
 							if err != nil {
 								return err
 							}
@@ -86,7 +86,7 @@ func genSelect(w *genpg.Writer, p *exp.Prog, alias Alias, q *Query) error {
 					return fmt.Errorf("not implemented")
 				}
 			} else if c.Exp != nil {
-				err := w.WriteExp(c.Job, c.Exp)
+				err := dapgx.WriteExp(w, c.Job, c.Exp)
 				if err != nil {
 					return err
 				}
@@ -124,8 +124,7 @@ type jobTranslator struct {
 func (jt *jobTranslator) Translate(p *exp.Prog, env exp.Env, s *exp.Sym) (string, lit.Val, error) {
 	j := qry.FindJob(s.Env)
 	if j == nil {
-		panic(fmt.Errorf("translate no job env found %T", s.Env))
-		return genpg.ExpEnv{}.Translate(p, env, s)
+		return dapgx.ExpEnv{}.Translate(p, env, s)
 	}
 	n := s.Rel[1:]
 	sp := strings.SplitN(n, ".", 2)
@@ -139,7 +138,7 @@ func (jt *jobTranslator) Translate(p *exp.Prog, env exp.Env, s *exp.Sym) (string
 	return "", nil, fmt.Errorf("no selection for %q", s.Sym)
 }
 
-func genCommon(w *genpg.Writer, j *qry.Job) error {
+func genCommon(w *dapgx.Writer, j *qry.Job) error {
 	if len(j.Ord) > 0 {
 		w.WriteString(" ORDER BY ")
 		for i, ord := range j.Ord {
@@ -168,7 +167,7 @@ func genCommon(w *genpg.Writer, j *qry.Job) error {
 	}
 	return nil
 }
-func genFrom(w *genpg.Writer, a Alias, q *Query, i int) error {
+func genFrom(w *dapgx.Writer, a Alias, q *Query, i int) error {
 	if i > 0 {
 		w.WriteString(", ")
 	} else {
@@ -184,7 +183,7 @@ func genFrom(w *genpg.Writer, a Alias, q *Query, i int) error {
 	}
 	return nil
 }
-func genWhere(w *genpg.Writer, q *Query, i int) (_ int, err error) {
+func genWhere(w *dapgx.Writer, q *Query, i int) (_ int, err error) {
 	for _, whr := range q.Whr {
 		if i == 0 {
 			w.WriteString(" WHERE ")
@@ -192,7 +191,7 @@ func genWhere(w *genpg.Writer, q *Query, i int) (_ int, err error) {
 			w.WriteString(" AND ")
 		}
 		i++
-		err = w.WriteExp(q.Job, whr)
+		err = dapgx.WriteExp(w, q.Job, whr)
 		if err != nil {
 			return i, err
 		}
