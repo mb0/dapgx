@@ -98,7 +98,6 @@ func genSelect(w *dapgx.Writer, p *exp.Prog, alias Alias, q *Query) error {
 			w.WriteString(c.Key)
 		}
 	}
-	// TODO wrap json
 	err := genFrom(w, alias, q, 0)
 	if err != nil {
 		return err

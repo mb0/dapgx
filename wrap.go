@@ -3,6 +3,7 @@ package dapgx
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgtype"
 	"xelf.org/xelf/bfr"
@@ -28,6 +29,8 @@ func WrapArg(arg interface{}) interface{} {
 
 func WrapPtr(reg *lit.Reg, ptr interface{}) interface{} {
 	switch p := ptr.(type) {
+	case *lit.Time:
+		return (*time.Time)(p)
 	case **lit.Strc:
 		v := *p
 		if v == nil {

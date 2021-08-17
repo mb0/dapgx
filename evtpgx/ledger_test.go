@@ -40,15 +40,15 @@ func testSetup(t *testing.T) (*lit.Reg, *dom.Project, *pgxpool.Pool) {
 
 func testProject(reg *lit.Reg) (*dom.Project, error) {
 	p := &dom.Project{}
-	mig, err := dom.ReadSchema(reg, strings.NewReader(mig.RawSchema()), "mig.daql", p)
+	mig, err := dom.ReadSchema(reg, strings.NewReader(mig.RawSchema()), "mig.daql", nil)
 	if err != nil {
 		return nil, err
 	}
-	ev, err := dom.ReadSchema(reg, strings.NewReader(evt.RawSchema()), "evt.daql", p)
+	ev, err := dom.ReadSchema(reg, strings.NewReader(evt.RawSchema()), "evt.daql", nil)
 	if err != nil {
 		return nil, err
 	}
-	pr, err := dom.ReadSchema(reg, strings.NewReader(domtest.ProdRaw), "prod.daql", p)
+	pr, err := dom.ReadSchema(reg, strings.NewReader(domtest.ProdRaw), "prod.daql", nil)
 	if err != nil {
 		return nil, err
 	}

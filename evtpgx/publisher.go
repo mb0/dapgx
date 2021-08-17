@@ -2,6 +2,7 @@ package evtpgx
 
 import (
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -83,9 +84,15 @@ func (p *Publisher) Publish(t evt.Trans) (time.Time, []*evt.Event, error) {
 		// insert audit
 		err = p.apply(&p.publisher, c, evs)
 		if err != nil {
+			log.Printf("apply failed %v", err)
 			return err
 		}
-		return p.insertAudit(c, rev, t.Audit)
+		err = p.insertAudit(c, rev, t.Audit)
+		if err != nil {
+			log.Printf("insert audit failed %v", err)
+			return err
+		}
+		return nil
 	})
 	if err != nil {
 		return p.rev, nil, err
