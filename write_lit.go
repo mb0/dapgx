@@ -32,9 +32,9 @@ func TypString(t typ.Type) (string, error) {
 		return "timestamptz", nil
 	case knd.Span:
 		return "interval", nil
-	case knd.Any, knd.All, knd.Data, knd.Keyr, knd.Idxr, knd.Strc, knd.Dict, knd.Rec, knd.Obj:
+	case knd.Any, knd.All, knd.Data, knd.Keyr, knd.Strc, knd.Dict, knd.Rec, knd.Obj:
 		return "jsonb", nil
-	case knd.List:
+	case knd.List, knd.Idxr:
 		if n := typ.ContEl(t); n.Kind&knd.Prim == n.Kind {
 			res, err := TypString(n)
 			if err != nil {
@@ -55,6 +55,9 @@ func WriteVal(b *Writer, t typ.Type, l lit.Val) error {
 		return b.Fmt("NULL")
 	}
 	l = l.Value()
+	if t == typ.Void {
+		t = l.Type()
+	}
 	switch k := t.Kind & knd.Data; true {
 	case k == knd.Data:
 		return writeJSONB(b, l)
@@ -74,9 +77,7 @@ func WriteVal(b *Writer, t typ.Type, l lit.Val) error {
 	case k == knd.Span:
 		return writeSuffix(b, l, "::interval")
 	case k&knd.Char != 0:
-		return l.Print(&b.P)
-	case k == knd.Enum:
-		// TODO write string and cast with qualified enum name
+		return WriteQuote(b, l.String())
 	case k == knd.List:
 		if e := typ.El(t); e.Kind != knd.Void && e.Kind&knd.Prim == e.Kind&knd.Any {
 			// use postgres array for one dimensional primitive arrays
@@ -86,14 +87,13 @@ func WriteVal(b *Writer, t typ.Type, l lit.Val) error {
 	case k&knd.Keyr != 0:
 		return writeJSONB(b, l)
 	}
-	return fmt.Errorf("unexpected lit %s", l)
+	return fmt.Errorf("unexpected lit %s %s", t, l)
 }
 
 // WriteQuote quotes a string as a postgres string, all single quotes are use sql escaping.
-func WriteQuote(w bfr.Writer, text string) {
-	w.WriteByte('\'')
-	w.WriteString(strings.Replace(text, "'", "''", -1))
-	w.WriteByte('\'')
+func WriteQuote(w *Writer, text string) error { return w.Fmt(Quote(text)) }
+func Quote(text string) string {
+	return fmt.Sprintf("'%s'", strings.Replace(text, "'", "''", -1))
 }
 
 func writeSuffix(w *Writer, l lit.Val, fix string) error {
@@ -132,8 +132,5 @@ func writeArray(w *Writer, l lit.Idxr) error {
 	if err != nil {
 		return err
 	}
-	w.WriteString("::")
-	w.WriteString(t)
-	w.WriteString("[]")
-	return nil
+	return w.Fmt("::%s[]", t)
 }

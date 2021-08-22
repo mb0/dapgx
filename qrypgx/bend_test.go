@@ -21,6 +21,7 @@ var testDsn = "host=/var/run/postgresql dbname=daql"
 func getBackend(reg *lit.Reg, db *pgxpool.Pool) (qry.Backend, error) {
 	f := domtest.Must(domtest.ProdFixture(reg))
 	if db != nil {
+		dompgx.DropProject(db, &f.Project)
 		err := dompgx.CreateProject(db, &f.Project)
 		if err != nil {
 			return nil, err

@@ -32,7 +32,7 @@ func TestGenQuery(t *testing.T) {
 			`SELECT id, name FROM prod.cat ORDER BY name`,
 		}},
 		{`(*prod.cat _ id; label:('label: ' .name))`, []string{
-			`SELECT id, 'label: ' || name as label FROM prod.cat`,
+			`SELECT id, CONCAT('label: ', name) as label FROM prod.cat`,
 		}},
 		{`(?prod.prod (eq .name 'A')
 			_ name; cname:(?prod.cat (eq .id ..cat) _:name)

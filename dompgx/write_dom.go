@@ -3,6 +3,7 @@ package dompgx
 import (
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"strings"
 
@@ -19,13 +20,13 @@ func WriteSchemaFile(fname string, p *dom.Project, s *dom.Schema) error {
 	defer bfr.Put(b)
 	w := dapgx.NewWriter(b, p, nil, nil)
 	w.Project = p
-	w.WriteString(w.Header)
-	w.WriteString("BEGIN;\n\n")
+	w.Fmt(w.Header)
+	w.Fmt("BEGIN;\n\n")
 	err := WriteSchema(w, s)
 	if err != nil {
 		return fmt.Errorf("render file %s error: %v", fname, err)
 	}
-	w.WriteString("COMMIT;\n")
+	w.Fmt("COMMIT;\n")
 	f, err := os.OpenFile(fname, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return err
@@ -63,15 +64,13 @@ func WriteSchema(w *dapgx.Writer, s *dom.Schema) (err error) {
 		if err != nil {
 			return err
 		}
-		w.WriteString(";\n\n")
+		w.Fmt(";\n\n")
 	}
 	return nil
 }
 
 func WriteEnum(w *dapgx.Writer, m *dom.Model) error {
-	w.WriteString("CREATE TYPE ")
-	w.WriteString(m.Qualified())
-	w.WriteString(" AS ENUM (")
+	w.Fmt("CREATE TYPE %s.%s AS ENUM (", m.Schema, checkIdent(m.Key()))
 	w.Indent()
 	for i, c := range m.Consts() {
 		if i > 0 {
@@ -87,9 +86,7 @@ func WriteEnum(w *dapgx.Writer, m *dom.Model) error {
 }
 
 func WriteTable(w *dapgx.Writer, m *dom.Model) error {
-	w.WriteString("CREATE TABLE ")
-	w.WriteString(m.Qualified())
-	w.WriteString(" (")
+	w.Fmt("CREATE TABLE %s.%s (", m.Schema, checkIdent(m.Key()))
 	w.Indent()
 	for i, p := range m.Params() {
 		if i > 0 {
@@ -107,6 +104,17 @@ func WriteTable(w *dapgx.Writer, m *dom.Model) error {
 	return w.WriteByte(')')
 }
 
+func checkIdent(name string) string {
+	name, ok := dapgx.Unreserved(name)
+	if !ok {
+		// we explicitly want to log every reserved identifier whenever
+		// we generate an sql schema so can change those names early.
+		log.Printf("use of reserved postgresql ident %q", name)
+		name = fmt.Sprintf("\"%s\"", name)
+	}
+	return name
+}
+
 func writeField(w *dapgx.Writer, p typ.Param, el *dom.Elem) error {
 	key := p.Key
 	if key == "" {
@@ -120,24 +128,24 @@ func writeField(w *dapgx.Writer, p typ.Param, el *dom.Elem) error {
 			return fmt.Errorf("unexpected embedded field type %s", p.Type)
 		}
 	}
-	w.WriteString(key)
-	w.WriteByte(' ')
+	w.Fmt(checkIdent(key))
+	w.Byte(' ')
 	ts, err := dapgx.TypString(p.Type)
 	if err != nil {
 		return err
 	}
 	if ts == "int8" && el.Bits&dom.BitPK != 0 && el.Bits&dom.BitAuto != 0 {
-		w.WriteString("serial8")
+		w.Fmt("serial8")
 	} else {
-		w.WriteString(ts)
+		w.Fmt(ts)
 	}
 	if el.Bits&dom.BitPK != 0 {
-		w.WriteString(" PRIMARY KEY")
+		w.Fmt(" PRIMARY KEY")
 		// TODO auto
 	} else if el.Bits&dom.BitOpt != 0 || p.Type.Kind&knd.None != 0 {
-		w.WriteString(" NULL")
+		w.Fmt(" NULL")
 	} else {
-		w.WriteString(" NOT NULL")
+		w.Fmt(" NOT NULL")
 	}
 	// TODO default
 	// TODO references
@@ -145,32 +153,37 @@ func writeField(w *dapgx.Writer, p typ.Param, el *dom.Elem) error {
 }
 
 func writeEmbed(w *dapgx.Writer, t typ.Type) error {
-	m := w.Project.Model(typ.Name(t))
+	ref := typ.Name(t)
+	ps := strings.Split(ref, ".")
+	if len(ps) > 1 {
+		ref = ps[0] + "." + cor.Keyed(ps[1])
+	}
+	m := w.Project.Model(ref)
 	if m == nil {
 		return fmt.Errorf("no model for %s", typ.Name(t))
 	}
 	for i, p := range m.Params() {
 		if i > 0 {
-			w.WriteByte(',')
+			w.Byte(',')
 			if !w.Break() {
-				w.WriteByte(' ')
+				w.Byte(' ')
 			}
 		}
 		if p.Key == "" {
 			writeEmbed(w, p.Type)
 			continue
 		}
-		w.WriteString(p.Key)
-		w.WriteByte(' ')
+		w.Fmt(checkIdent(p.Key))
+		w.Byte(' ')
 		ts, err := dapgx.TypString(p.Type)
 		if err != nil {
 			return err
 		}
-		w.WriteString(ts)
+		w.Fmt(ts)
 		if p.IsOpt() || p.Type.Kind&knd.None != 0 {
-			w.WriteString(" NULL")
+			w.Fmt(" NULL")
 		} else {
-			w.WriteString(" NOT NULL")
+			w.Fmt(" NOT NULL")
 			// TODO implicit default
 		}
 	}
