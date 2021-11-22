@@ -55,18 +55,22 @@ func WriteSchema(w *dapgx.Writer, s *dom.Schema) (err error) {
 	}
 	w.Fmt("CREATE SCHEMA %s;\n\n", s.Name)
 	for _, m := range ms {
-		switch m.Kind.Kind {
-		case knd.Enum:
-			err = WriteEnum(w, m)
-		default:
-			err = WriteTable(w, m)
-		}
+		err = WriteModel(w, m)
 		if err != nil {
 			return err
 		}
 		w.Fmt(";\n\n")
 	}
 	return nil
+}
+
+func WriteModel(w *dapgx.Writer, m *dom.Model) error {
+	switch m.Kind.Kind {
+	case knd.Enum:
+		return WriteEnum(w, m)
+	default:
+		return WriteTable(w, m)
+	}
 }
 
 func WriteEnum(w *dapgx.Writer, m *dom.Model) error {
@@ -82,13 +86,15 @@ func WriteEnum(w *dapgx.Writer, m *dom.Model) error {
 		dapgx.WriteQuote(w, cor.Keyed(c.Name))
 	}
 	w.Dedent()
-	return w.WriteByte(')')
+	return w.Fmt(");")
 }
 
 func WriteTable(w *dapgx.Writer, m *dom.Model) error {
-	w.Fmt("CREATE TABLE %s.%s (", m.Schema, checkIdent(m.Key()))
+	tname := fmt.Sprintf("%s.%s", m.Schema, checkIdent(m.Key()))
+	w.Fmt("CREATE TABLE %s (", tname)
 	w.Indent()
-	for i, p := range m.Params() {
+	params := m.Params()
+	for i, p := range params {
 		if i > 0 {
 			w.WriteByte(',')
 			if !w.Break() {
@@ -101,7 +107,26 @@ func WriteTable(w *dapgx.Writer, m *dom.Model) error {
 		}
 	}
 	w.Dedent()
-	return w.WriteByte(')')
+	w.Fmt(");")
+	for i, e := range m.Elems {
+		if e.Bits&dom.BitIdx == 0 {
+			continue
+		}
+		pkey := params[i].Key
+		name := fmt.Sprintf("%s_%s_idx", m.Key(), pkey)
+		w.Fmt("\nCREATE INDEX %s on %s (%s);", name, tname, pkey)
+	}
+	if m.Object != nil {
+		for _, ind := range m.Object.Indices {
+			xtra, kind := "idx", "INDEX"
+			if ind.Unique {
+				xtra, kind = "uniq", "UNIQUE INDEX"
+			}
+			name := fmt.Sprintf("%s_%s_%s", m.Key(), strings.Join(ind.Keys, "_"), xtra)
+			w.Fmt("\nCREATE %s %s on %s (%s);", kind, name, tname, strings.Join(ind.Keys, ", "))
+		}
+	}
+	return nil
 }
 
 func checkIdent(name string) string {
@@ -147,8 +172,21 @@ func writeField(w *dapgx.Writer, p typ.Param, el *dom.Elem) error {
 	} else {
 		w.Fmt(" NOT NULL")
 	}
-	// TODO default
-	// TODO references
+	if el.Bits&dom.BitUniq != 0 {
+		w.Fmt(" UNIQUE")
+	}
+	extra, _ := el.Extra.Key("def")
+	if extra != nil && !extra.Nil() {
+		w.Fmt(" DEFAULT %s", extra)
+	}
+	if el.Ref != "" {
+		m := w.Project.Model(strings.ToLower(el.Ref))
+		if m == nil {
+			return fmt.Errorf("no model for %s", el.Ref)
+		}
+		name := fmt.Sprintf("%s.%s", m.Schema, checkIdent(m.Key()))
+		w.Fmt(" REFERENCES %s deferrable", name)
+	}
 	return nil
 }
 

@@ -179,6 +179,8 @@ gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c/go.mod h1:K4uyk7z7BCEPqu6E+C
 honnef.co/go/tools v0.0.1-2019.2.3/go.mod h1:a3bituU0lyd329TUQxRnasdCoJDkEUEAqEt0JzvZhAg=
 xelf.org/daql v0.0.0-20210822013922-32fe23ae240d h1:alI7LaQaex+CphToksVeWXY8OcMmVqbeOPMwxk212A0=
 xelf.org/daql v0.0.0-20210822013922-32fe23ae240d/go.mod h1:6ldpYHRu5SK3pTCMjvuHiCpnVdqBG4WY7BOkS5hT14Y=
+xelf.org/daql v0.0.0-20211122193141-e08380bf0d86 h1:tTij31NIVFszivkESjkZyI77MH8MBquMKx+V//fZUew=
+xelf.org/daql v0.0.0-20211122193141-e08380bf0d86/go.mod h1:6ldpYHRu5SK3pTCMjvuHiCpnVdqBG4WY7BOkS5hT14Y=
 xelf.org/xelf v0.0.0-20210822004056-3ec66da63a21/go.mod h1:bm1EiA9l29A9LLR52rFbxjDjFcW+60JU0UOQn+Tm9EA=
 xelf.org/xelf v0.0.0-20210822193425-97b133c558f4 h1:L1DMdl1wkR8TB62OA0Rkb2QlQ3clYZs/cFygVJRS8GQ=
 xelf.org/xelf v0.0.0-20210822193425-97b133c558f4/go.mod h1:bm1EiA9l29A9LLR52rFbxjDjFcW+60JU0UOQn+Tm9EA=
