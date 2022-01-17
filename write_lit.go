@@ -22,8 +22,9 @@ func TypString(t typ.Type) (string, error) {
 	case knd.Char, knd.Str:
 		return "text", nil
 	case knd.Enum:
-		// TODO
-		// write qualified enum name
+		b := t.Body.(*typ.ConstBody)
+		// TODO better conversion check for reserved names
+		return strings.ToLower(b.Name), nil
 	case knd.Raw:
 		return "bytea", nil
 	case knd.UUID:

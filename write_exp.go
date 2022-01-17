@@ -93,7 +93,29 @@ func init() {
 		"json":  writeFunc(renderJSON),
 		"make":  writeFunc(renderMake),
 		"len":   writeFunc(renderLen),
+		// dyn:      should already be resolved. lazily resolved dyns are disallowed.
+		// dot, let: we should be able to replace all occurrences of the declarations
+		//           otherwise we can use with ctes
+		// append:   for typed and jsonb arrays
+		// mut:      for typed and jsonb arrays, json object
+		// fn, fold, foldr, range: maybe possible as inline subquery?
+		"index": writeFunc(renderCall("strpos")),
+		// "last": (length($1) - strpos($1, $2))
+		"prefix":   writeLike{dir: 1}, // $1 like $2||'%'
+		"suffix":   writeLike{dir: 2}, // $1 like '%'||$2
+		"contains": writeLike{dir: 3}, // $1 like '%'||$2||'%'
+		"upper":    writeFunc(renderCall("upper")),
+		"lower":    writeFunc(renderCall("lower")),
+		"trim":     writeFunc(renderCallOpt("trim", "both ' \t' from ")),
+		"like":     writeLike{},          // $1 like $2
+		"ilike":    writeLike{ign: true}, // $1 ilike $2
 	}
+}
+
+type writePlain struct {
+	pre string
+	btw string
+	suf string
 }
 
 const (
@@ -134,8 +156,54 @@ type (
 		op     string
 		strict bool
 	}
+	writeLike struct {
+		ign bool
+		dir byte
+	}
 )
 
+func (r writePlain) WriteCall(w *Writer, env exp.Env, e *exp.Call) error {
+	defer w.Prec(PrecIn)()
+	w.Fmt(r.pre)
+	var i int
+	each(e.Args, func(a exp.Exp) error {
+		if i++; i > 1 {
+			w.Fmt(r.btw)
+		}
+		return WriteExp(w, env, a)
+	})
+	return w.Fmt(r.suf)
+}
+func (r writeLike) WriteCall(w *Writer, env exp.Env, e *exp.Call) error {
+	defer w.Prec(PrecIn)()
+	var i int
+	each(e.Args, func(a exp.Exp) error {
+		switch i {
+		case 1:
+			if r.ign {
+				w.WriteString(" ilike ")
+			} else {
+				w.WriteString(" like ")
+			}
+			if r.dir&2 != 0 {
+				w.WriteString("'%'||")
+			}
+			if r.dir != 0 {
+				w.WriteString("replace(replace(replace(")
+				err := WriteExp(w, env, a)
+				w.WriteString(`, '\', '\\'), '_', '\_'), '%', '\%')`)
+				return err
+			}
+			return WriteExp(w, env, a)
+		}
+		i++
+		return WriteExp(w, env, a)
+	})
+	if r.dir&1 != 0 {
+		w.WriteString("||'%'")
+	}
+	return nil
+}
 func (r writeRaw) WriteCall(w *Writer, env exp.Env, e *exp.Call) error {
 	defer w.Prec(r.prec)()
 	return w.Fmt(r.raw)
@@ -203,10 +271,14 @@ func (r writeArith) WriteCall(w *Writer, env exp.Env, e *exp.Call) error {
 }
 
 func renderCall(name string) writeFunc {
+	return renderCallOpt(name, "")
+}
+func renderCallOpt(name, pre string) writeFunc {
 	return func(w *Writer, env exp.Env, e *exp.Call) error {
 		defer w.Prec(PrecDef)()
 		w.Fmt(name)
 		w.Byte('(')
+		w.Fmt(pre)
 		err := writeEach(w, env, e.Args, ", ")
 		if err != nil {
 			return err
