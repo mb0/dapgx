@@ -53,13 +53,13 @@ func WriteSchema(w *dapgx.Writer, s *dom.Schema) (err error) {
 		w.Fmt("-- schema %s has no enums or tables\n\n", s.Name)
 		return nil
 	}
-	w.Fmt("CREATE SCHEMA %s;\n\n", s.Name)
+	w.Fmt("CREATE SCHEMA %s;\n\n", warnIdent(s.Name))
 	for _, m := range ms {
 		err = WriteModel(w, m)
 		if err != nil {
 			return err
 		}
-		w.Fmt(";\n\n")
+		w.Fmt("\n\n")
 	}
 	return nil
 }
@@ -74,15 +74,11 @@ func WriteModel(w *dapgx.Writer, m *dom.Model) error {
 }
 
 func WriteEnum(w *dapgx.Writer, m *dom.Model) error {
-	w.Fmt("CREATE TYPE %s.%s AS ENUM (", m.Schema, checkIdent(m.Key()))
+	w.Fmt("CREATE TYPE %s.%s AS ENUM (", checkIdent(m.Schema), warnIdent(m.Key()))
 	w.Indent()
-	for i, c := range m.Consts() {
-		if i > 0 {
-			w.WriteByte(',')
-			if !w.Break() {
-				w.WriteByte(' ')
-			}
-		}
+	w.Fmt("''")
+	for _, c := range m.Consts() {
+		w.Fmt(", ")
 		dapgx.WriteQuote(w, cor.Keyed(c.Name))
 	}
 	w.Dedent()
@@ -90,7 +86,7 @@ func WriteEnum(w *dapgx.Writer, m *dom.Model) error {
 }
 
 func WriteTable(w *dapgx.Writer, m *dom.Model) error {
-	tname := fmt.Sprintf("%s.%s", m.Schema, checkIdent(m.Key()))
+	tname := fmt.Sprintf("%s.%s", checkIdent(m.Schema), warnIdent(m.Key()))
 	w.Fmt("CREATE TABLE %s (", tname)
 	w.Indent()
 	params := m.Params()
@@ -129,12 +125,19 @@ func WriteTable(w *dapgx.Writer, m *dom.Model) error {
 	return nil
 }
 
-func checkIdent(name string) string {
+func warnIdent(name string) string {
 	name, ok := dapgx.Unreserved(name)
 	if !ok {
 		// we explicitly want to log every reserved identifier whenever
 		// we generate an sql schema so can change those names early.
 		log.Printf("use of reserved postgresql ident %q", name)
+		name = fmt.Sprintf("\"%s\"", name)
+	}
+	return name
+}
+func checkIdent(name string) string {
+	name, ok := dapgx.Unreserved(name)
+	if !ok {
 		name = fmt.Sprintf("\"%s\"", name)
 	}
 	return name
@@ -164,20 +167,30 @@ func writeField(w *dapgx.Writer, p typ.Param, el *dom.Elem) error {
 	} else {
 		w.Fmt(ts)
 	}
+	var null bool
 	if el.Bits&dom.BitPK != 0 {
-		w.Fmt(" PRIMARY KEY")
+		w.Fmt(" primary key")
 		// TODO auto
-	} else if el.Bits&dom.BitOpt != 0 || p.Type.Kind&knd.None != 0 {
-		w.Fmt(" NULL")
+	} else if null = p.Type.Kind&knd.None != 0; null {
+		w.Fmt(" null")
 	} else {
-		w.Fmt(" NOT NULL")
+		w.Fmt(" not null")
 	}
 	if el.Bits&dom.BitUniq != 0 {
-		w.Fmt(" UNIQUE")
+		w.Fmt(" unique")
 	}
 	extra, _ := el.Extra.Key("def")
 	if extra != nil && !extra.Nil() {
-		w.Fmt(" DEFAULT %s", extra)
+		w.Fmt(" default %s", extra)
+	} else if !null && el.Bits&dom.BitOpt != 0 {
+		switch ts {
+		case "bool":
+			w.Fmt(" default FALSE")
+		case "text":
+			w.Fmt(" default ''")
+		case "int8":
+			w.Fmt(" default 0")
+		}
 	}
 	if el.Ref != "" {
 		m := w.Project.Model(strings.ToLower(el.Ref))
@@ -185,7 +198,7 @@ func writeField(w *dapgx.Writer, p typ.Param, el *dom.Elem) error {
 			return fmt.Errorf("no model for %s", el.Ref)
 		}
 		name := fmt.Sprintf("%s.%s", m.Schema, checkIdent(m.Key()))
-		w.Fmt(" REFERENCES %s deferrable", name)
+		w.Fmt(" references %s deferrable", name)
 	}
 	return nil
 }

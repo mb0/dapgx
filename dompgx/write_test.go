@@ -30,17 +30,17 @@ func TestWriteTable(t *testing.T) {
 		model string
 		want  string
 	}{
-		{"kind", "CREATE TYPE foo.kind AS ENUM (\n\t'a',\n\t'b',\n\t'c'\n);"},
-		{"node1", "CREATE TABLE foo.node1 (\n\tname text NULL\n);\n" +
+		{"kind", "CREATE TYPE foo.kind AS ENUM (\n\t'', 'a', 'b', 'c'\n);"},
+		{"node1", "CREATE TABLE foo.node1 (\n\tname text not null default ''\n);\n" +
 			"CREATE INDEX node1_name_idx on foo.node1 (name);"},
-		{"node2", "CREATE TABLE foo.node2 (\n\tid int8 PRIMARY KEY,\n\tstart timestamptz NOT NULL UNIQUE\n);"},
-		{"node3", "CREATE TABLE foo.node3 (\n\tid int8 PRIMARY KEY,\n" +
-			"\t\"group\" text NOT NULL,\n\tname text NOT NULL\n);\n" +
+		{"node2", "CREATE TABLE foo.node2 (\n\tid int8 primary key,\n\tstart timestamptz not null unique\n);"},
+		{"node3", "CREATE TABLE foo.node3 (\n\tid int8 primary key,\n" +
+			"\t\"group\" text not null,\n\tname text not null\n);\n" +
 			"CREATE UNIQUE INDEX node3_group_name_uniq on foo.node3 (group, name);"},
-		{"node4", "CREATE TABLE foo.node4 (\n\tid int8 PRIMARY KEY,\n" +
-			"\tnode2 int8 NOT NULL REFERENCES foo.node2 deferrable\n);"},
-		{"node5", "CREATE TABLE foo.node5 (\n\tid int8 PRIMARY KEY,\n" +
-			"\tval bool NOT NULL DEFAULT false\n);"},
+		{"node4", "CREATE TABLE foo.node4 (\n\tid int8 primary key,\n" +
+			"\tnode2 int8 not null references foo.node2 deferrable\n);"},
+		{"node5", "CREATE TABLE foo.node5 (\n\tid int8 primary key,\n" +
+			"\tval bool not null default false\n);"},
 	}
 	for _, test := range tests {
 		var b strings.Builder
