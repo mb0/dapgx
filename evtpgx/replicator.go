@@ -50,7 +50,7 @@ func NewReplicator(p *Publisher, rels ...string) (evt.LocalPublisher, error) {
 func (r *Replicator) Replicate(newrev time.Time, evs []*evt.Event) error {
 	drop := r.checkLocal(evs)
 	rev := r.rev
-	err := dapgx.WithTx(r.DB, func(c dapgx.C) error {
+	err := dapgx.WithTx(r.DB, func(c dapgx.PC) error {
 		err := r.apply(r.publisher, c, evs)
 		if err != nil {
 			return err
@@ -82,7 +82,7 @@ func (r *Replicator) LocalRev() time.Time { return r.lrev }
 func (r *Replicator) PublishLocal(data evt.Trans) (lrev time.Time, evs []*evt.Event, err error) {
 	t := &data
 	t.Base = r.lrev
-	err = dapgx.WithTx(r.DB, func(c dapgx.C) error {
+	err = dapgx.WithTx(r.DB, func(c dapgx.PC) error {
 		srev, err := queryMaxRev(c)
 		if err != nil {
 			return fmt.Errorf("query rev: %w", err)

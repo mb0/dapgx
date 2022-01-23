@@ -14,7 +14,7 @@ import (
 )
 
 func CreateProject(db *pgxpool.Pool, p *dom.Project) error {
-	return dapgx.WithTx(db, func(tx dapgx.C) error {
+	return dapgx.WithTx(db, func(tx dapgx.PC) error {
 		err := dropProject(tx, p)
 		if err != nil {
 			return err
@@ -36,7 +36,7 @@ func CreateProject(db *pgxpool.Pool, p *dom.Project) error {
 }
 
 func DropProject(db *pgxpool.Pool, p *dom.Project) error {
-	return dapgx.WithTx(db, func(tx dapgx.C) error {
+	return dapgx.WithTx(db, func(tx dapgx.PC) error {
 		return dropProject(tx, p)
 	})
 }
@@ -90,7 +90,7 @@ func dropProject(tx dapgx.C, p *dom.Project) error {
 }
 
 func CopyFrom(db *pgxpool.Pool, reg *lit.Reg, s *dom.Schema, fix *lit.Dict) error {
-	return dapgx.WithTx(db, func(tx dapgx.C) error {
+	return dapgx.WithTx(db, func(tx dapgx.PC) error {
 		for _, kv := range fix.Keyed {
 			m := s.Model(kv.Key)
 			cols := make([]string, 0, len(m.Elems))

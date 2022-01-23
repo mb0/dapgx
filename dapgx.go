@@ -2,11 +2,14 @@ package dapgx
 
 import (
 	"context"
+	"crypto/sha1"
 	"fmt"
+	"io"
 
 	"github.com/jackc/pgconn"
 	pgx "github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
+	"xelf.org/xelf/lit"
 )
 
 var BG = context.Background()
@@ -20,14 +23,20 @@ type C interface {
 	CopyFrom(Ctx, pgx.Identifier, []string, pgx.CopyFromSource) (int64, error)
 }
 
+type PC interface {
+	C
+	Prepare(Ctx, string, string) (*pgconn.StatementDescription, error)
+}
+
 var _ C = (*pgxpool.Pool)(nil)
-var _ C = (*pgx.Conn)(nil)
+var _ PC = (*pgx.Conn)(nil)
+var _ PC = (pgx.Tx)(nil)
 
 type DB interface {
 	Begin(Ctx) (pgx.Tx, error)
 }
 
-func WithTx(db DB, f func(C) error) error {
+func WithTx(db DB, f func(PC) error) error {
 	tx, err := db.Begin(BG)
 	if err != nil {
 		return err

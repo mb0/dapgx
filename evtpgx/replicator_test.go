@@ -8,7 +8,7 @@ import (
 	"xelf.org/xelf/lit"
 )
 
-func TestReclicator(t *testing.T) {
+func TestReplicator(t *testing.T) {
 	reg, pr, db := testSetup(t)
 	defer db.Close()
 	p, err := NewStatefulPublisher(db, pr, reg)

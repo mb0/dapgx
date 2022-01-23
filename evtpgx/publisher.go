@@ -13,7 +13,7 @@ import (
 	"xelf.org/xelf/lit"
 )
 
-type applyFunc func(*publisher, dapgx.C, []*evt.Event) error
+type applyFunc func(*publisher, dapgx.PC, []*evt.Event) error
 
 type Publisher struct {
 	publisher
@@ -63,7 +63,7 @@ func (p *Publisher) Publish(t evt.Trans) (time.Time, []*evt.Event, error) {
 		}
 		evs = append(evs, &evt.Event{Rev: rev, Action: act})
 	}
-	err := dapgx.WithTx(p.DB, func(c dapgx.C) error {
+	err := dapgx.WithTx(p.DB, func(c dapgx.PC) error {
 		cur, err := queryMaxRev(c)
 		if err != nil {
 			return fmt.Errorf("query max rev: %w", err)
@@ -81,12 +81,12 @@ func (p *Publisher) Publish(t evt.Trans) (time.Time, []*evt.Event, error) {
 				// TODO check for conflict
 			}
 		}
-		// insert audit
 		err = p.apply(&p.publisher, c, evs)
 		if err != nil {
 			log.Printf("apply failed %v", err)
 			return err
 		}
+		// insert audit
 		err = p.insertAudit(c, rev, t.Audit)
 		if err != nil {
 			log.Printf("insert audit failed %v", err)
@@ -101,7 +101,7 @@ func (p *Publisher) Publish(t evt.Trans) (time.Time, []*evt.Event, error) {
 	return p.rev, evs, nil
 }
 
-func (p *publisher) insertAudit(c dapgx.C, rev time.Time, d evt.Audit) error {
+func (p *publisher) insertAudit(c dapgx.PC, rev time.Time, d evt.Audit) error {
 	_, err := c.Exec(dapgx.BG, `INSERT INTO evt.audit
 		(rev, created, arrived, usr, extra) VALUES
 		($1, $2, $3, $4, $5)`,
@@ -113,7 +113,7 @@ func (p *publisher) insertAudit(c dapgx.C, rev time.Time, d evt.Audit) error {
 	return nil
 }
 
-func insertEvents(p *publisher, c dapgx.C, evs []*evt.Event) error {
+func insertEvents(p *publisher, c dapgx.PC, evs []*evt.Event) error {
 	for _, ev := range evs {
 		err := c.QueryRow(dapgx.BG, `INSERT INTO evt.event
 			(rev, top, key, cmd, arg) VALUES
@@ -127,7 +127,7 @@ func insertEvents(p *publisher, c dapgx.C, evs []*evt.Event) error {
 	return nil
 }
 
-func applyAndInsertEvents(p *publisher, c dapgx.C, evs []*evt.Event) error {
+func applyAndInsertEvents(p *publisher, c dapgx.PC, evs []*evt.Event) error {
 	for _, ev := range evs {
 		err := applyEvent(p, c, ev)
 		if err != nil {
@@ -137,7 +137,7 @@ func applyAndInsertEvents(p *publisher, c dapgx.C, evs []*evt.Event) error {
 	return insertEvents(p, c, evs)
 }
 
-func applyEvent(p *publisher, c dapgx.C, ev *evt.Event) (err error) {
+func applyEvent(p *publisher, c dapgx.PC, ev *evt.Event) error {
 	m := p.Project().Model(ev.Top)
 	if m == nil {
 		return fmt.Errorf("no model found for topic %s", ev.Top)
