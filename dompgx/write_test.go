@@ -31,7 +31,7 @@ func TestWriteTable(t *testing.T) {
 		want  string
 	}{
 		{"kind", "CREATE TYPE foo.kind AS ENUM (\n\t'', 'a', 'b', 'c'\n);"},
-		{"node1", "CREATE TABLE foo.node1 (\n\tname text not null default ''\n);\n" +
+		{"node1", "CREATE TABLE foo.node1 (\n\tname text null\n);\n" +
 			"CREATE INDEX node1_name_idx on foo.node1 (name);"},
 		{"node2", "CREATE TABLE foo.node2 (\n\tid int8 primary key,\n\tstart timestamptz not null unique\n);"},
 		{"node3", "CREATE TABLE foo.node3 (\n\tid int8 primary key,\n" +

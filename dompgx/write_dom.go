@@ -167,13 +167,15 @@ func writeField(w *dapgx.Writer, p typ.Param, el *dom.Elem) error {
 	} else {
 		w.Fmt(ts)
 	}
-	var null bool
 	if el.Bits&dom.BitPK != 0 {
+
 		w.Fmt(" primary key")
 		// TODO auto
-	} else if null = p.Type.Kind&knd.None != 0; null {
+	}
+	null := p.Type.Kind&knd.None != 0 || p.Name != "" && p.Name[len(p.Name)-1] == '?'
+	if null {
 		w.Fmt(" null")
-	} else {
+	} else if el.Bits&dom.BitPK == 0 {
 		w.Fmt(" not null")
 	}
 	if el.Bits&dom.BitUniq != 0 {
@@ -232,9 +234,9 @@ func writeEmbed(w *dapgx.Writer, t typ.Type) error {
 		}
 		w.Fmt(ts)
 		if p.IsOpt() || p.Type.Kind&knd.None != 0 {
-			w.Fmt(" NULL")
+			w.Fmt(" null")
 		} else {
-			w.Fmt(" NOT NULL")
+			w.Fmt(" not null")
 			// TODO implicit default
 		}
 	}
