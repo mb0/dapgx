@@ -13,7 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jackc/pgproto3/v2"
 	"github.com/jackc/pgtype"
 	"xelf.org/xelf/cor"
 	"xelf.org/xelf/knd"
@@ -25,13 +24,13 @@ import (
 type Decoder func(raw []byte, reg *lit.Reg) (lit.Val, error)
 
 // FieldDecoder returns a decoder for the given field description fd.
-func FieldDecoder(fd pgproto3.FieldDescription) (res Decoder) {
-	decs, ok := decmap[fd.DataTypeOID]
+func FieldDecoder(oid uint32, bin bool) (res Decoder) {
+	decs, ok := decmap[oid]
 	if ok {
-		if fd.Format == pgtype.BinaryFormatCode {
-			res = decs.bin
+		if bin {
+			res = decs.Binary
 		} else {
-			res = decs.txt
+			res = decs.Text
 		}
 	}
 	if res == nil {
@@ -40,9 +39,17 @@ func FieldDecoder(fd pgproto3.FieldDescription) (res Decoder) {
 	return res
 }
 
-type decs struct{ txt, bin Decoder }
+func FieldDecoders(oid uint32) DecoderPair {
+	decs, ok := decmap[oid]
+	if ok {
+		return decs
+	}
+	return DecoderPair{errDecoder, errDecoder}
+}
 
-var decmap = map[uint32]decs{
+type DecoderPair struct{ Text, Binary Decoder }
+
+var decmap = map[uint32]DecoderPair{
 	pgtype.BoolOID:        {boolTextDec, boolBinDec},
 	pgtype.ByteaOID:       {rawTextDec, rawBinDec},
 	pgtype.Int2OID:        {intTextDec, int2BinDec},
@@ -177,7 +184,7 @@ func dateTextDec(raw []byte, _ *lit.Reg) (lit.Val, error) {
 	case "infinity", "-infinity":
 		return lit.Time{}, nil
 	}
-	t, err := time.ParseInLocation("2006-01-02", s, time.UTC)
+	t, err := time.ParseInLocation("2006-01-02", s, time.Local)
 	return lit.Time(t), err
 }
 func dateBinDec(raw []byte, _ *lit.Reg) (lit.Val, error) {
@@ -189,7 +196,7 @@ func dateBinDec(raw []byte, _ *lit.Reg) (lit.Val, error) {
 	case math.MaxInt32, math.MinInt32:
 		return lit.Time{}, nil
 	}
-	t := time.Date(2000, 1, 1+int(day), 0, 0, 0, 0, time.UTC)
+	t := time.Date(2000, 1, 1+int(day), 0, 0, 0, 0, time.Local)
 	return lit.Time(t), nil
 }
 
@@ -200,7 +207,7 @@ func tsTextDec(raw []byte, _ *lit.Reg) (lit.Val, error) {
 		return lit.Time{}, nil
 	}
 	t, err := time.Parse("2006-01-02 15:04:05.999999999", s)
-	return lit.Time(t), err
+	return lit.Time(t.In(time.Local)), err
 }
 func tsBinDec(raw []byte, _ *lit.Reg) (lit.Val, error) {
 	if n := 8; len(raw) != n {
@@ -215,7 +222,7 @@ func tsBinDec(raw []byte, _ *lit.Reg) (lit.Val, error) {
 	t := time.Unix(
 		(µs/1_000_000)+sUnixToY2k,
 		(µs%1_000_000)*1_000,
-	).UTC()
+	)
 	return lit.Time(t), nil
 }
 
@@ -235,7 +242,7 @@ func tstzTextDec(raw []byte, _ *lit.Reg) (lit.Val, error) {
 		format = "2006-01-02 15:04:05.999999999Z07:00"
 	}
 	t, err := time.Parse(format, s)
-	return lit.Time(t), err
+	return lit.Time(t.In(time.Local)), err
 }
 
 const sUnixToY2k = 946684800
@@ -375,8 +382,8 @@ func jsonbDec(raw []byte, reg *lit.Reg) (lit.Val, error) {
 	return lit.Read(reg, bytes.NewReader(raw[1:]), "jsonb")
 }
 
-func arrayDecs(txt, bin Decoder, t typ.Type) decs {
-	return decs{arrayTextDec(txt, t), arrayBinDec(bin, t)}
+func arrayDecs(txt, bin Decoder, t typ.Type) DecoderPair {
+	return DecoderPair{arrayTextDec(txt, t), arrayBinDec(bin, t)}
 }
 func arrayTextDec(eldec Decoder, elt typ.Type) Decoder {
 	return func(raw []byte, reg *lit.Reg) (lit.Val, error) {

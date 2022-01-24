@@ -3,6 +3,7 @@ package dapgx
 import (
 	"fmt"
 
+	"github.com/jackc/pgtype"
 	pgx "github.com/jackc/pgx/v4"
 
 	"xelf.org/xelf/lit"
@@ -79,7 +80,8 @@ func newScanner(reg *lit.Reg, scal bool, rows pgx.Rows) (*scanner, error) {
 	}
 	cols := make([]scancol, len(fds))
 	for i, fd := range fds {
-		cols[i] = scancol{string(fd.Name), FieldDecoder(fd)}
+		dec := FieldDecoder(fd.DataTypeOID, fd.Format == pgtype.BinaryFormatCode)
+		cols[i] = scancol{string(fd.Name), dec}
 	}
 	return &scanner{Rows: rows, reg: reg, scal: scal, cols: cols}, nil
 }
