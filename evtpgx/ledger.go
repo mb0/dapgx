@@ -45,9 +45,6 @@ func (l *ledger) Events(rev time.Time, tops ...string) ([]*evt.Event, error) {
 	return l.queryEvents(l.DB, "WHERE rev > $1 AND top in $2", rev, tops)
 }
 
-func (l *ledger) arg(arg interface{}) interface{} { return dapgx.WrapArg(arg) }
-func (l *ledger) ptr(arg interface{}) interface{} { return dapgx.WrapPtr(l.Reg, arg) }
-
 func queryMaxRev(c dapgx.C) (time.Time, error) {
 	rev := time.Time{}
 	err := c.QueryRow(dapgx.BG, "SELECT rev FROM evt.event ORDER BY rev DESC LIMIT 1").Scan(&rev)
@@ -56,23 +53,14 @@ func queryMaxRev(c dapgx.C) (time.Time, error) {
 	}
 	return rev, nil
 }
-func (l *ledger) queryEvents(c dapgx.C, whr string, args ...interface{}) ([]*evt.Event, error) {
+func (l *ledger) queryEvents(c dapgx.C, whr string, args ...interface{}) (res []*evt.Event, _ error) {
 	rows, err := c.Query(dapgx.BG, fmt.Sprintf("SELECT id, rev, top, key, cmd, arg "+
 		"FROM evt.event %s ORDER BY id", whr), args...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var res []*evt.Event
-	for rows.Next() {
-		var e evt.Event
-		err = rows.Scan(&e.ID, &e.Rev, &e.Top, &e.Key, &e.Cmd, l.ptr(&e.Arg))
-		if err != nil {
-			return nil, fmt.Errorf("scan event: %w", err)
-		}
-		res = append(res, &e)
-	}
-	err = rows.Err()
+	err = dapgx.ScanMany(l.Reg, false, l.Reg.MustProxy(&res), rows)
 	if err != nil {
 		return nil, err
 	}

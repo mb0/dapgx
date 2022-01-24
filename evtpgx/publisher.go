@@ -3,13 +3,17 @@ package evtpgx
 import (
 	"fmt"
 	"log"
+	"strconv"
 	"strings"
 	"time"
 
+	pgx "github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"xelf.org/dapgx"
 	"xelf.org/daql/dom"
 	"xelf.org/daql/evt"
+	"xelf.org/xelf/cor"
+	"xelf.org/xelf/knd"
 	"xelf.org/xelf/lit"
 )
 
@@ -54,7 +58,7 @@ func (p *Publisher) Publish(t evt.Trans) (time.Time, []*evt.Event, error) {
 	}
 	evs := make([]*evt.Event, 0, len(t.Acts))
 	rev := evt.NextRev(p.rev, now)
-	check := p.rev.After(t.Base)
+	check := false // p.rev.After(t.Base)
 	var keys []string
 	for _, act := range t.Acts {
 		if check && act.Cmd != evt.CmdNew {
@@ -102,24 +106,41 @@ func (p *Publisher) Publish(t evt.Trans) (time.Time, []*evt.Event, error) {
 }
 
 func (p *publisher) insertAudit(c dapgx.PC, rev time.Time, d evt.Audit) error {
-	_, err := c.Exec(dapgx.BG, `INSERT INTO evt.audit
+	err := dapgx.Exec(dapgx.BG, c, `INSERT INTO evt.audit
 		(rev, created, arrived, usr, extra) VALUES
-		($1, $2, $3, $4, $5)`,
-		rev, d.Created, d.Arrived, d.Usr, p.arg(d.Extra),
-	)
+		($1, $2, $3, $4, $5)`, []lit.Val{
+		lit.Time(rev), lit.Time(d.Created), lit.Time(d.Arrived),
+		lit.Str(d.Usr), d.Extra,
+	})
 	if err != nil {
 		return fmt.Errorf("insert audit: %w", err)
 	}
 	return nil
 }
 
+func scanOne(rows pgx.Rows, arg ...interface{}) error {
+	defer rows.Close()
+	if !rows.Next() {
+		return fmt.Errorf("no rows returned")
+	}
+	err := rows.Scan(arg...)
+	if err != nil {
+		return err
+	}
+	return rows.Err()
+}
+
 func insertEvents(p *publisher, c dapgx.PC, evs []*evt.Event) error {
 	for _, ev := range evs {
-		err := c.QueryRow(dapgx.BG, `INSERT INTO evt.event
+		rows, err := dapgx.Query(dapgx.BG, c, `INSERT INTO evt.event
 			(rev, top, key, cmd, arg) VALUES
-			($1, $2, $3, $4, $5) RETURNING id`,
-			ev.Rev, ev.Top, ev.Key, ev.Cmd, p.arg(ev.Arg),
-		).Scan(&ev.ID)
+			($1, $2, $3, $4, $5) returning id`, []lit.Val{
+			lit.Time(ev.Rev), lit.Str(ev.Top), lit.Str(ev.Key), lit.Str(ev.Cmd), ev.Arg,
+		})
+		if err != nil {
+			return fmt.Errorf("insert events: %w", err)
+		}
+		err = scanOne(rows, &ev.ID)
 		if err != nil {
 			return fmt.Errorf("insert events: %w", err)
 		}
@@ -145,7 +166,10 @@ func applyEvent(p *publisher, c dapgx.PC, ev *evt.Event) error {
 	switch ev.Cmd {
 	case evt.CmdDel:
 		stmt := fmt.Sprintf("DELETE FROM %s WHERE id = $1", m.Qualified())
-		_, err = c.Exec(dapgx.BG, stmt, ev.Key)
+		_, err := c.Exec(dapgx.BG, stmt, ev.Key)
+		if err != nil {
+			return err
+		}
 	case evt.CmdNew:
 		qry := p.insTop[ev.Top]
 		if qry == "" {
@@ -159,17 +183,21 @@ func applyEvent(p *publisher, c dapgx.PC, ev *evt.Event) error {
 		if err != nil {
 			return err
 		}
-		_, err = c.Exec(dapgx.BG, qry, args...)
+		err = dapgx.Exec(dapgx.BG, c, qry, args)
+		if err != nil {
+			return err
+		}
 	case evt.CmdMod:
 		qry, args, err := p.updateObj(m, ev)
 		if err != nil {
 			return err
 		}
-		_, err = c.Exec(dapgx.BG, qry, args...)
+		err = dapgx.Exec(dapgx.BG, c, qry, args)
+		if err != nil {
+			return err
+		}
 	default:
-	}
-	if err != nil {
-		return fmt.Errorf("apply %s %s %s %s: %w", ev.Top, ev.Key, ev.Cmd, ev.Arg, err)
+		return fmt.Errorf("unexpected command %s", ev.Cmd)
 	}
 	return nil
 }
@@ -196,28 +224,49 @@ func insertObj(m *dom.Model) string {
 	return b.String()
 }
 
-func (p *publisher) insertArgs(m *dom.Model, ev *evt.Event) ([]interface{}, error) {
-	args := make([]interface{}, 0, len(m.Elems))
+func keyToID(f *dom.Elem, key string) (lit.Val, error) {
+	switch f.Type.Kind & knd.Prim {
+	case knd.Int:
+		n, err := strconv.ParseInt(key, 10, 64)
+		return lit.Int(n), err
+	case knd.Str:
+		return lit.Str(key), nil
+	case knd.UUID:
+		u, err := cor.ParseUUID(key)
+		return lit.UUID(u), err
+	case knd.Time:
+		t, err := cor.ParseTime(key)
+		return lit.Time(t), err
+	}
+	return nil, fmt.Errorf("unexpected id type %s", f.Type)
+}
+
+func (p *publisher) insertArgs(m *dom.Model, ev *evt.Event) ([]lit.Val, error) {
+	args := make([]lit.Val, 0, len(m.Elems))
 	for _, f := range m.Elems {
 		k := f.Key()
 		if k == "id" {
-			args = append(args, ev.Key)
+			id, err := keyToID(f, ev.Key)
+			if err != nil {
+				return nil, err
+			}
+			args = append(args, id)
 		} else if k == "rev" {
-			args = append(args, ev.Rev)
+			args = append(args, lit.Time(ev.Rev))
 		} else {
 			v, err := ev.Arg.Key(k)
 			if err != nil {
 				return nil, err
 			}
-			args = append(args, p.arg(v))
+			args = append(args, v)
 		}
 	}
 	return args, nil
 }
 
-func (p *publisher) updateObj(m *dom.Model, ev *evt.Event) (string, []interface{}, error) {
-	args := make([]interface{}, 0, ev.Arg.Len()+1)
-	args = append(args, ev.Key)
+func (p *publisher) updateObj(m *dom.Model, ev *evt.Event) (string, []lit.Val, error) {
+	args := make([]lit.Val, 0, ev.Arg.Len()+1)
+	args = append(args, lit.Str(ev.Key))
 	var b strings.Builder
 	b.WriteString("UPDATE ")
 	b.WriteString(m.Qualified())
@@ -227,9 +276,9 @@ func (p *publisher) updateObj(m *dom.Model, ev *evt.Event) (string, []interface{
 		if k == "id" {
 			continue
 		}
-		var arg interface{}
+		var arg lit.Val
 		if k == "rev" {
-			arg = ev.Rev
+			arg = lit.Time(ev.Rev)
 		} else {
 			val, err := ev.Arg.Key(k)
 			if err != nil {
@@ -238,7 +287,7 @@ func (p *publisher) updateObj(m *dom.Model, ev *evt.Event) (string, []interface{
 			if val.Zero() {
 				continue
 			}
-			arg = p.arg(val)
+			arg = val
 		}
 		if len(args) > 1 {
 			b.WriteString(", ")

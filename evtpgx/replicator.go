@@ -8,6 +8,7 @@ import (
 	"xelf.org/dapgx"
 	"xelf.org/daql/evt"
 	"xelf.org/daql/log"
+	"xelf.org/xelf/lit"
 )
 
 func Replay(p *Publisher, evs []*evt.Event) error {
@@ -102,11 +103,21 @@ func (r *Replicator) PublishLocal(data evt.Trans) (lrev time.Time, evs []*evt.Ev
 			return err
 		}
 		// insert local
-		err = c.QueryRow(dapgx.BG, `INSERT INTO evt.trans
+		rows, err := dapgx.Query(dapgx.BG, c, `INSERT INTO evt.trans
 			(base, rev, created, arrived, usr, extra, acts)
-			values ($1, $2, $3, $4, $5, $6, $7) returning id`,
-			t.Base, t.Rev, t.Created, t.Arrived, t.Usr, r.arg(t.Extra), t.Acts,
-		).Scan(&t.ID)
+			values ($1, $2, $3, $4, $5, $6, $7) returning id`, []lit.Val{
+			lit.Time(t.Base),
+			lit.Time(t.Rev),
+			lit.Time(t.Created),
+			lit.Time(t.Arrived),
+			lit.Str(t.Usr),
+			t.Extra,
+			r.Reg.MustProxy(&t.Acts),
+		})
+		if err != nil {
+			return err
+		}
+		err = scanOne(rows, &t.ID)
 		if err != nil {
 			return err
 		}
@@ -156,15 +167,11 @@ func (p *publisher) queryLocal(c dapgx.C) ([]*evt.Trans, error) {
 	}
 	defer rows.Close()
 	var res []*evt.Trans
-	for rows.Next() {
-		var t evt.Trans
-		err = rows.Scan(&t.ID, &t.Base, &t.Rev, &t.Created, &t.Arrived, &t.Usr, p.ptr(&t.Extra), &t.Acts)
-		if err != nil {
-			return nil, fmt.Errorf("scan local trans: %w", err)
-		}
-		res = append(res, &t)
+	mut, err := p.Reg.Proxy(&res)
+	if err != nil {
+		return nil, err
 	}
-	err = rows.Err()
+	err = dapgx.ScanMany(p.Reg, false, mut, rows)
 	if err != nil {
 		return nil, err
 	}

@@ -5,7 +5,6 @@ import (
 	"log"
 	"time"
 
-	pgx "github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"xelf.org/dapgx"
 	"xelf.org/daql/dom"
@@ -47,7 +46,6 @@ func (b *Backend) Exec(p *exp.Prog, j *qry.Job) (lit.Val, error) {
 	if err != nil {
 		return nil, err
 	}
-	start := time.Now()
 	for _, q := range batch.List {
 		// generate each query and add them to a batch
 		err := b.execQuery(p, q)
@@ -55,7 +53,6 @@ func (b *Backend) Exec(p *exp.Prog, j *qry.Job) (lit.Val, error) {
 			return nil, err
 		}
 	}
-	log.Printf("exec batch %d took %s", len(batch.List), time.Now().Sub(start))
 	// query the batch and read in the results
 	// update the result value of the jobs
 	return j.Val, nil
@@ -65,140 +62,40 @@ func (b *Backend) execQuery(p *exp.Prog, q *Query) error {
 	if err != nil {
 		return err
 	}
-	var args []interface{}
+	start := time.Now()
+	defer func() {
+		log.Printf("query %s took %s", qs, time.Now().Sub(start))
+	}()
+	var args []lit.Val
 	if len(ps) != 0 {
-		args = make([]interface{}, 0, len(ps))
+		args = make([]lit.Val, 0, len(ps))
 		for _, p := range ps {
 			if p.Value != nil {
-				args = append(args, dapgx.WrapArg(p.Value))
+				args = append(args, p.Value)
 				continue
 			}
 			return fmt.Errorf("unexpected external param %+v", p)
 		}
 	}
-	start := time.Now()
-	log.Printf("query %s", qs)
-	rows, err := b.DB.Query(dapgx.BG, qs, args...)
-	if err != nil {
-		return fmt.Errorf("query %s: %w", qs, err)
-	}
-	defer rows.Close()
-	mut, err := p.Reg.Zero(typ.Deopt(q.Res))
-	if err != nil {
-		return fmt.Errorf("query %s: %w", qs, err)
-	}
-	start = time.Now()
-	defer func() {
-		log.Printf("scan took %s", time.Now().Sub(start))
-	}()
-	q.Val = mut
-	switch {
-	case q.Kind&KindScalar != 0:
-		return b.scanScalar(p, q, mut, rows)
-	case q.Kind&KindOne != 0:
-		return b.scanOne(p, q, mut, rows)
-	case q.Kind&KindMany != 0:
-		return b.scanMany(p, q, mut, rows)
-	}
-	return fmt.Errorf("unexpected query kind for %s", q.Ref)
-}
-
-func (b *Backend) scanScalar(p *exp.Prog, q *Query, mut lit.Mut, rows pgx.Rows) error {
-	if !rows.Next() {
-		return fmt.Errorf("no result for query %s", q.Ref)
-	}
-	err := rows.Scan(dapgx.WrapPtr(p.Reg, mut.Ptr()))
-	if err != nil {
-		return fmt.Errorf("scan row for query %s: %w", q.Ref, err)
-	}
-	if rows.Next() {
-		return fmt.Errorf("additional results for query %s", q.Ref)
-	}
-	return rows.Err()
-}
-func (b *Backend) scanOne(p *exp.Prog, q *Query, mut lit.Mut, rows pgx.Rows) error {
-	if rows.Next() {
-		err := b.scanRow(p, q, mut, rows)
+	return b.DB.AcquireFunc(dapgx.BG, func(c *pgxpool.Conn) error {
+		rows, err := dapgx.Query(dapgx.BG, c.Conn(), qs, args)
 		if err != nil {
-			return err
+			return fmt.Errorf("query %s: %w", qs, err)
 		}
-	}
-	if rows.Next() {
-		return fmt.Errorf("additional results for query %s", q.Ref)
-	}
-	return rows.Err()
-}
-func (b *Backend) scanMany(p *exp.Prog, q *Query, mut lit.Mut, rows pgx.Rows) error {
-	a, ok := mut.(lit.Apdr)
-	if !ok {
-		return fmt.Errorf("expect appender result got %T", mut)
-	}
-	et := typ.ContEl(mut.Type())
-	for rows.Next() {
-		el, err := p.Reg.Zero(typ.Deopt(et))
+		defer rows.Close()
+		mut, err := p.Reg.Zero(typ.Deopt(q.Res))
 		if err != nil {
-			return err
+			return fmt.Errorf("query %s: %w", qs, err)
 		}
-		err = b.scanRow(p, q, el, rows)
+		q.Val = mut
+		scan := dapgx.ScanMany
+		if q.Kind&KindMany == 0 {
+			scan = dapgx.ScanOne
+		}
+		err = scan(p.Reg, q.Kind&KindScalar != 0, mut, rows)
 		if err != nil {
-			return err
+			return fmt.Errorf("query %s: %w", qs, err)
 		}
-		err = a.Append(el)
-		if err != nil {
-			return err
-		}
-	}
-	return rows.Err()
-}
-func (b *Backend) scanRow(p *exp.Prog, q *Query, mut lit.Mut, rows pgx.Rows) (err error) {
-	k, ok := mut.(lit.Keyr)
-	if !ok {
-		panic(fmt.Errorf("scanRow expect keyr got %T %s", mut, mut))
-	}
-	opts := make([]*lit.OptMut, 0, len(q.Cols))
-	args := make([]interface{}, 0, len(q.Cols))
-	for _, c := range q.Cols {
-		var v lit.Val
-		if c.Job == q.Job || c.Job.Kind&KindInlined != 0 {
-			v, err = k.Key(c.Key)
-			if err != nil {
-				return fmt.Errorf("scan %s %s: %w", q.Ref, c.Key, err)
-			}
-		} else { // joined table
-			v, err = k.Key(c.Key)
-			if err != nil {
-				return fmt.Errorf("scan %s %s: %w", q.Ref, c.Key, err)
-			}
-			if c.Job.Kind&KindScalar == 0 {
-				sub, ok := v.(lit.Keyr)
-				if !ok {
-					return fmt.Errorf("scan join expect keyr got %T", v)
-				}
-				v, err = sub.Key(c.Key)
-				if err != nil {
-					return fmt.Errorf("scan join field %s: %w", c.Key, err)
-				}
-			} else {
-				log.Printf("scalar join mut %s %T", v, v)
-			}
-		}
-		mut, ok := v.(lit.Mut)
-		if !ok {
-			return fmt.Errorf("scan %s expect proxy got %T from %s", q.Ref, v, mut.Type())
-		}
-		o, _ := v.(*lit.OptMut)
-		opts = append(opts, o)
-		args = append(args, dapgx.WrapPtr(p.Reg, mut.Ptr()))
-	}
-	err = rows.Scan(args...)
-	if err != nil {
-		return fmt.Errorf("scan %s: %w", q.Ref, err)
-	}
-
-	for _, opt := range opts {
-		if opt != nil {
-			opt.Null = opt.Mut.Zero()
-		}
-	}
-	return nil
+		return nil
+	})
 }

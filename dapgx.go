@@ -61,3 +61,46 @@ func Open(dsn string, logger pgx.Logger) (*pgxpool.Pool, error) {
 	}
 	return db, nil
 }
+
+func Query(ctx Ctx, pc PC, sql string, args []lit.Val) (pgx.Rows, error) {
+	name, wrap, err := prep(ctx, pc, sql, args)
+	if err != nil {
+		return nil, err
+	}
+	return pc.Query(ctx, name, wrap...)
+}
+
+func Exec(ctx Ctx, pc PC, sql string, args []lit.Val) error {
+	name, wrap, err := prep(ctx, pc, sql, args)
+	if err != nil {
+		return err
+	}
+	_, err = pc.Exec(ctx, name, wrap...)
+	return err
+}
+
+func prep(ctx Ctx, pc PC, sql string, args []lit.Val) (string, []interface{}, error) {
+	name := hashSql(sql)
+	sd, err := pc.Prepare(ctx, name, sql)
+	if err != nil {
+		return "", nil, err
+	}
+	if len(sd.ParamOIDs) != len(args) {
+		return "", nil, fmt.Errorf("invalid number of params")
+	}
+	res := make([]interface{}, len(args))
+	for i, oid := range sd.ParamOIDs {
+		enc, err := FieldEncoder(oid, args[i])
+		if err != nil {
+			return "", nil, err
+		}
+		res[i] = enc
+	}
+	return name, res, nil
+}
+
+func hashSql(sql string) string {
+	h := sha1.New()
+	io.WriteString(h, sql)
+	return fmt.Sprintf("%x", h.Sum(nil))
+}
