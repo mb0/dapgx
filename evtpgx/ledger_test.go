@@ -1,6 +1,7 @@
 package evtpgx
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -17,6 +18,8 @@ import (
 
 var testDsn = "host=/var/run/postgresql dbname=daql"
 
+var _ evt.Ledger = (*ledger)(nil)
+
 func testSetup(t *testing.T) (*lit.Reg, *dom.Project, *pgxpool.Pool) {
 	t.Helper()
 	reg := &lit.Reg{}
@@ -24,12 +27,13 @@ func testSetup(t *testing.T) (*lit.Reg, *dom.Project, *pgxpool.Pool) {
 	if err != nil {
 		t.Fatalf("setup project %v", err)
 	}
-	db, err := dapgx.Open(testDsn, nil)
+	ctx := context.Background()
+	db, err := dapgx.Open(ctx, testDsn, nil)
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
 	if db != nil {
-		err := dompgx.CreateProject(db, pr)
+		err := dompgx.CreateProject(ctx, db, pr)
 		if err != nil {
 			db.Close()
 			t.Fatalf("create project: %v", err)
@@ -48,7 +52,7 @@ func testProject(reg *lit.Reg) (*dom.Project, error) {
 	if err != nil {
 		return nil, err
 	}
-	pr, err := dom.ReadSchema(reg, strings.NewReader(domtest.ProdRaw), "prod.daql", nil)
+	pr, err := dom.ReadSchema(reg, strings.NewReader(domtest.PersonRaw), "person.daql", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -57,6 +61,6 @@ func testProject(reg *lit.Reg) (*dom.Project, error) {
 }
 
 func queryCount(c dapgx.C, table string) (res int, err error) {
-	err = c.QueryRow(dapgx.BG, fmt.Sprintf(`select count(*) from %s`, table)).Scan(&res)
+	err = c.QueryRow(context.Background(), fmt.Sprintf(`select count(*) from %s`, table)).Scan(&res)
 	return res, err
 }

@@ -86,11 +86,11 @@ func TestGenQuery(t *testing.T) {
 	for _, test := range tests {
 		ast, err := exp.Parse(reg, test.raw)
 		if err != nil {
-			t.Errorf("parse %s error: %w", test.raw, err)
+			t.Errorf("parse %s error: %v", test.raw, err)
 			continue
 		}
 		d := &qry.Doc{Qry: q}
-		c := exp.NewProg(reg, d, ast)
+		c := exp.NewProg(nil, reg, d, ast)
 		c.Exp, err = c.Resl(c.Root, c.Exp, typ.Void)
 		if err != nil {
 			t.Errorf("resolve %s error %+v", test.raw, err)

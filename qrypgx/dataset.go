@@ -1,13 +1,13 @@
 package qrypgx
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"strings"
 
 	pgx "github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
-	"xelf.org/dapgx"
 	"xelf.org/daql/dom"
 	"xelf.org/daql/mig"
 	"xelf.org/xelf/lit"
@@ -51,8 +51,8 @@ func openRowsIter(db *pgxpool.Pool, m *dom.Model) (*rowsIter, error) {
 	}
 	b.WriteString(" FROM ")
 	b.WriteString(m.Qualified())
-
-	rows, err := db.Query(dapgx.BG, b.String())
+	ctx := context.Background()
+	rows, err := db.Query(ctx, b.String())
 	if err != nil {
 		return nil, err
 	}

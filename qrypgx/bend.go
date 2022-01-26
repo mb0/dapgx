@@ -77,8 +77,8 @@ func (b *Backend) execQuery(p *exp.Prog, q *Query) error {
 			return fmt.Errorf("unexpected external param %+v", p)
 		}
 	}
-	return b.DB.AcquireFunc(dapgx.BG, func(c *pgxpool.Conn) error {
-		rows, err := dapgx.Query(dapgx.BG, c.Conn(), qs, args)
+	return b.DB.AcquireFunc(p.Ctx, func(c *pgxpool.Conn) error {
+		rows, err := dapgx.Query(p.Ctx, c.Conn(), qs, args)
 		if err != nil {
 			return fmt.Errorf("query %s: %w", qs, err)
 		}

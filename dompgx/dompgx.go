@@ -1,6 +1,7 @@
 package dompgx
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -13,19 +14,19 @@ import (
 	"xelf.org/xelf/lit"
 )
 
-func CreateProject(db *pgxpool.Pool, p *dom.Project) error {
-	return dapgx.WithTx(db, func(tx dapgx.PC) error {
-		err := dropProject(tx, p)
+func CreateProject(ctx context.Context, db *pgxpool.Pool, p *dom.Project) error {
+	return dapgx.WithTx(ctx, db, func(tx dapgx.PC) error {
+		err := dropProject(ctx, tx, p)
 		if err != nil {
 			return err
 		}
 		for _, s := range p.Schemas {
-			_, err = tx.Exec(dapgx.BG, "CREATE SCHEMA "+s.Name)
+			_, err = tx.Exec(ctx, "CREATE SCHEMA "+s.Name)
 			if err != nil {
 				return err
 			}
 			for _, m := range s.Models {
-				err = CreateModel(tx, p, s, m)
+				err = CreateModel(ctx, tx, p, s, m)
 				if err != nil {
 					return err
 				}
@@ -35,21 +36,21 @@ func CreateProject(db *pgxpool.Pool, p *dom.Project) error {
 	})
 }
 
-func DropProject(db *pgxpool.Pool, p *dom.Project) error {
-	return dapgx.WithTx(db, func(tx dapgx.PC) error {
-		return dropProject(tx, p)
+func DropProject(ctx context.Context, db *pgxpool.Pool, p *dom.Project) error {
+	return dapgx.WithTx(ctx, db, func(tx dapgx.PC) error {
+		return dropProject(ctx, tx, p)
 	})
 }
 
-func CreateModel(tx dapgx.C, p *dom.Project, s *dom.Schema, m *dom.Model) error {
+func CreateModel(ctx context.Context, tx dapgx.C, p *dom.Project, s *dom.Schema, m *dom.Model) error {
 	switch m.Kind.Kind {
 	case knd.Bits:
 		return nil
 	case knd.Enum:
-		return createModel(tx, p, m, WriteEnum)
+		return createModel(ctx, tx, p, m, WriteEnum)
 	case knd.Obj:
 		if hasFlag(m.Extra, "backup") || hasFlag(m.Extra, "topic") {
-			err := createModel(tx, p, m, WriteTable)
+			err := createModel(ctx, tx, p, m, WriteTable)
 			if err != nil {
 				return err
 			}
@@ -67,21 +68,21 @@ func hasFlag(d *lit.Dict, key string) bool {
 	return err == nil && !v.Zero()
 }
 
-func createModel(tx dapgx.C, p *dom.Project, m *dom.Model, f func(*dapgx.Writer, *dom.Model) error) error {
+func createModel(ctx context.Context, tx dapgx.C, p *dom.Project, m *dom.Model, f func(*dapgx.Writer, *dom.Model) error) error {
 	var b strings.Builder
 	w := dapgx.NewWriter(&b, p, nil, dapgx.ExpEnv{})
 	err := f(w, m)
 	if err != nil {
 		return err
 	}
-	_, err = tx.Exec(dapgx.BG, b.String())
+	_, err = tx.Exec(ctx, b.String())
 	return err
 }
 
-func dropProject(tx dapgx.C, p *dom.Project) error {
+func dropProject(ctx context.Context, tx dapgx.C, p *dom.Project) error {
 	for i := len(p.Schemas) - 1; i >= 0; i-- {
 		s := p.Schemas[i]
-		_, err := tx.Exec(dapgx.BG, "DROP SCHEMA IF EXISTS "+s.Name+" CASCADE")
+		_, err := tx.Exec(ctx, "DROP SCHEMA IF EXISTS "+s.Name+" CASCADE")
 		if err != nil {
 			return err
 		}
@@ -89,15 +90,15 @@ func dropProject(tx dapgx.C, p *dom.Project) error {
 	return nil
 }
 
-func CopyFrom(db *pgxpool.Pool, reg *lit.Reg, s *dom.Schema, fix *lit.Dict) error {
-	return dapgx.WithTx(db, func(tx dapgx.PC) error {
+func CopyFrom(ctx context.Context, db *pgxpool.Pool, reg *lit.Reg, s *dom.Schema, fix *lit.Dict) error {
+	return dapgx.WithTx(ctx, db, func(tx dapgx.PC) error {
 		for _, kv := range fix.Keyed {
 			m := s.Model(kv.Key)
 			cols := make([]string, 0, len(m.Elems))
 			for _, f := range m.Elems {
 				cols = append(cols, cor.Keyed(f.Name))
 			}
-			_, err := tx.CopyFrom(dapgx.BG, pgx.Identifier{m.Qual(), m.Key()}, cols, &litCopySrc{
+			_, err := tx.CopyFrom(ctx, pgx.Identifier{m.Qual(), m.Key()}, cols, &litCopySrc{
 				List: kv.Val.(*lit.List), reg: reg, m: m,
 			})
 			if err != nil {

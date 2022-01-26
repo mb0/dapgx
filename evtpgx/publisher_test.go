@@ -8,6 +8,8 @@ import (
 	"xelf.org/xelf/lit"
 )
 
+var _ evt.Publisher = (*Publisher)(nil)
+
 func TestPublisher(t *testing.T) {
 	reg, pr, db := testSetup(t)
 	defer db.Close()
@@ -18,7 +20,7 @@ func TestPublisher(t *testing.T) {
 	if !l.Rev().IsZero() {
 		t.Fatalf("initial rev is not zero")
 	}
-	evs, err := l.Events(time.Time{})
+	evs, err := l.Events(nil, time.Time{})
 	if err != nil {
 		t.Fatalf("initial events %v", err)
 	}
@@ -26,12 +28,12 @@ func TestPublisher(t *testing.T) {
 		t.Fatalf("initial events not empty")
 	}
 	rev, evs, err := l.Publish(evt.Trans{Acts: []evt.Action{
-		{Sig: evt.Sig{"prod.cat", "1"}, Cmd: evt.CmdNew, Arg: &lit.Dict{Keyed: []lit.KeyVal{
-			{Key: "name", Val: lit.Str("a")},
+		{Sig: evt.Sig{"person.group", "1"}, Cmd: evt.CmdNew, Arg: &lit.Dict{Keyed: []lit.KeyVal{
+			{Key: "name", Val: lit.Str("Test")},
 		}}},
-		{Sig: evt.Sig{"prod.prod", "25"}, Cmd: evt.CmdNew, Arg: &lit.Dict{Keyed: []lit.KeyVal{
-			{Key: "name", Val: lit.Str("Y")},
-			{Key: "cat", Val: lit.Int(1)},
+		{Sig: evt.Sig{"person.person", "25"}, Cmd: evt.CmdNew, Arg: &lit.Dict{Keyed: []lit.KeyVal{
+			{Key: "name", Val: lit.Str("Me")},
+			{Key: "family", Val: lit.Int(1)},
 		}}},
 	}})
 	if err != nil {
@@ -43,7 +45,7 @@ func TestPublisher(t *testing.T) {
 	if !l.Rev().Equal(rev) {
 		t.Fatalf("pub rev is not equal ledger rev")
 	}
-	evs, err = l.Events(time.Time{})
+	evs, err = l.Events(nil, time.Time{})
 	if err != nil {
 		t.Fatalf("pub events %v", err)
 	}
@@ -56,12 +58,12 @@ func TestPublisher(t *testing.T) {
 	if id := evs[1].ID; id != 2 {
 		t.Errorf("pub events want id 2 got %d", id)
 	}
-	catn, err := queryCount(db, "prod.cat")
-	if err != nil || catn != 1 {
-		t.Errorf("want 1 cats got %d %v", catn, err)
+	groupn, err := queryCount(db, "person.group")
+	if err != nil || groupn != 1 {
+		t.Errorf("want 1 groups got %d %v", groupn, err)
 	}
-	prodn, err := queryCount(db, "prod.prod")
-	if err != nil || prodn != 1 {
-		t.Errorf("want 1 prods got %d %v", prodn, err)
+	persn, err := queryCount(db, "person.person")
+	if err != nil || persn != 1 {
+		t.Errorf("want 1 persons got %d %v", persn, err)
 	}
 }

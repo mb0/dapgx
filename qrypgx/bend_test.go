@@ -1,6 +1,7 @@
 package qrypgx
 
 import (
+	"context"
 	"log"
 	"testing"
 	"time"
@@ -21,13 +22,14 @@ var testDsn = "host=/var/run/postgresql dbname=daql"
 func getBackend(reg *lit.Reg, db *pgxpool.Pool) (qry.Backend, error) {
 	f := domtest.Must(domtest.ProdFixture(reg))
 	if db != nil {
-		dompgx.DropProject(db, &f.Project)
-		err := dompgx.CreateProject(db, &f.Project)
+		ctx := context.Background()
+		dompgx.DropProject(ctx, db, &f.Project)
+		err := dompgx.CreateProject(ctx, db, &f.Project)
 		if err != nil {
 			return nil, err
 		}
 		s := f.Schema("prod")
-		err = dompgx.CopyFrom(db, reg, s, f.Fix)
+		err = dompgx.CopyFrom(ctx, db, reg, s, f.Fix)
 		if err != nil {
 			return nil, err
 		}
@@ -37,7 +39,8 @@ func getBackend(reg *lit.Reg, db *pgxpool.Pool) (qry.Backend, error) {
 }
 
 func TestQry(t *testing.T) {
-	db, err := dapgx.Open(testDsn, nil)
+	ctx := context.Background()
+	db, err := dapgx.Open(ctx, testDsn, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,7 +50,7 @@ func TestQry(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	db.QueryRow(dapgx.BG, "select true").Scan(new(bool))
+	db.QueryRow(ctx, "select true").Scan(new(bool))
 	tests := []struct {
 		Raw  string
 		Want string
@@ -99,7 +102,7 @@ func TestQry(t *testing.T) {
 	qry := qry.New(reg, extlib.Std, b)
 	for _, test := range tests {
 		start := time.Now()
-		el, err := qry.Exec(test.Raw, param)
+		el, err := qry.Exec(ctx, test.Raw, param)
 		end := time.Now()
 		if err != nil {
 			t.Errorf("qry %s error %+v", test.Raw, err)

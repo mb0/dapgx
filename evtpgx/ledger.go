@@ -1,6 +1,7 @@
 package evtpgx
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -35,26 +36,30 @@ func newLedger(db *pgxpool.Pool, pr *dom.Project, reg *lit.Reg) (ledger, error) 
 func (l *ledger) Rev() time.Time        { return l.rev }
 func (l *ledger) Project() *dom.Project { return l.Backend.Project }
 
-func (l *ledger) Events(rev time.Time, tops ...string) ([]*evt.Event, error) {
+func (l *ledger) Events(ctx context.Context, rev time.Time, tops ...string) ([]*evt.Event, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	if rev.IsZero() && len(tops) == 0 {
-		return l.queryEvents(l.DB, "")
+		return l.queryEvents(ctx, l.DB, "")
 	}
 	if len(tops) == 0 {
-		return l.queryEvents(l.DB, "WHERE rev > $1", rev)
+		return l.queryEvents(ctx, l.DB, "WHERE rev > $1", rev)
 	}
-	return l.queryEvents(l.DB, "WHERE rev > $1 AND top in $2", rev, tops)
+	return l.queryEvents(ctx, l.DB, "WHERE rev > $1 AND top in $2", rev, tops)
 }
 
 func queryMaxRev(c dapgx.C) (time.Time, error) {
 	rev := time.Time{}
-	err := c.QueryRow(dapgx.BG, "SELECT rev FROM evt.event ORDER BY rev DESC LIMIT 1").Scan(&rev)
+	err := c.QueryRow(context.Background(),
+		"SELECT rev FROM evt.event ORDER BY rev DESC LIMIT 1").Scan(&rev)
 	if err != nil && err != pgx.ErrNoRows {
 		return rev, err
 	}
 	return rev, nil
 }
-func (l *ledger) queryEvents(c dapgx.C, whr string, args ...interface{}) (res []*evt.Event, _ error) {
-	rows, err := c.Query(dapgx.BG, fmt.Sprintf("SELECT id, rev, top, key, cmd, arg "+
+func (l *ledger) queryEvents(ctx context.Context, c dapgx.C, whr string, args ...interface{}) (res []*evt.Event, _ error) {
+	rows, err := c.Query(ctx, fmt.Sprintf("SELECT id, rev, top, key, cmd, arg "+
 		"FROM evt.event %s ORDER BY id", whr), args...)
 	if err != nil {
 		return nil, err

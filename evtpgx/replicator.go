@@ -1,6 +1,7 @@
 package evtpgx
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -34,7 +35,7 @@ type Replicator struct {
 }
 
 func NewReplicator(p *Publisher, rels ...string) (evt.LocalPublisher, error) {
-	local, err := p.queryLocal(p.DB)
+	local, err := p.queryLocal(context.Background(), p.DB)
 	if err != nil {
 		return nil, err
 	}
@@ -51,8 +52,9 @@ func NewReplicator(p *Publisher, rels ...string) (evt.LocalPublisher, error) {
 func (r *Replicator) Replicate(newrev time.Time, evs []*evt.Event) error {
 	drop := r.checkLocal(evs)
 	rev := r.rev
-	err := dapgx.WithTx(r.DB, func(c dapgx.PC) error {
-		err := r.apply(r.publisher, c, evs)
+	ctx := context.Background()
+	err := dapgx.WithTx(ctx, r.DB, func(c dapgx.PC) error {
+		err := r.apply(ctx, r.publisher, c, evs)
 		if err != nil {
 			return err
 		}
@@ -62,7 +64,7 @@ func (r *Replicator) Replicate(newrev time.Time, evs []*evt.Event) error {
 				rev = ev.Rev
 			}
 		}
-		err = deleteLocal(c, drop)
+		err = deleteLocal(ctx, c, drop)
 		if err != nil {
 			log.Error("evtpgx: local trans purge error", "err", err)
 		}
@@ -83,7 +85,8 @@ func (r *Replicator) LocalRev() time.Time { return r.lrev }
 func (r *Replicator) PublishLocal(data evt.Trans) (lrev time.Time, evs []*evt.Event, err error) {
 	t := &data
 	t.Base = r.lrev
-	err = dapgx.WithTx(r.DB, func(c dapgx.PC) error {
+	ctx := context.Background()
+	err = dapgx.WithTx(ctx, r.DB, func(c dapgx.PC) error {
 		srev, err := queryMaxRev(c)
 		if err != nil {
 			return fmt.Errorf("query rev: %w", err)
@@ -103,7 +106,7 @@ func (r *Replicator) PublishLocal(data evt.Trans) (lrev time.Time, evs []*evt.Ev
 			return err
 		}
 		// insert local
-		rows, err := dapgx.Query(dapgx.BG, c, `INSERT INTO evt.trans
+		rows, err := dapgx.Query(ctx, c, `INSERT INTO evt.trans
 			(base, rev, created, arrived, usr, extra, acts)
 			values ($1, $2, $3, $4, $5, $6, $7) returning id`, []lit.Val{
 			lit.Time(t.Base),
@@ -123,7 +126,7 @@ func (r *Replicator) PublishLocal(data evt.Trans) (lrev time.Time, evs []*evt.Ev
 		}
 		// all went well. only apply the events
 		for _, ev := range evs {
-			err := applyEvent(r.publisher, c, ev)
+			err := applyEvent(ctx, r.publisher, c, ev)
 			if err != nil {
 				return fmt.Errorf("apply: %w", err)
 			}
@@ -159,8 +162,8 @@ func reviseActions(c dapgx.C, t *evt.Trans) ([]*evt.Event, error) {
 	return evs, nil
 }
 
-func (p *publisher) queryLocal(c dapgx.C) ([]*evt.Trans, error) {
-	rows, err := c.Query(dapgx.BG, `SELECT id, base, rev, created, arrived, usr, extra, acts
+func (p *publisher) queryLocal(ctx context.Context, c dapgx.C) ([]*evt.Trans, error) {
+	rows, err := c.Query(ctx, `SELECT id, base, rev, created, arrived, usr, extra, acts
 		FROM evt.trans ORDER BY id`)
 	if err != nil {
 		return nil, err
@@ -177,7 +180,7 @@ func (p *publisher) queryLocal(c dapgx.C) ([]*evt.Trans, error) {
 	}
 	return res, nil
 }
-func deleteLocal(c dapgx.C, drop []int64) error {
+func deleteLocal(ctx context.Context, c dapgx.C, drop []int64) error {
 	if len(drop) == 0 {
 		return nil
 	}
@@ -190,7 +193,7 @@ func deleteLocal(c dapgx.C, drop []int64) error {
 		fmt.Fprintf(&str, "%d", id)
 	}
 	str.WriteByte(')')
-	_, err := c.Exec(dapgx.BG, str.String())
+	_, err := c.Exec(ctx, str.String())
 	return err
 }
 func (s *Replicator) checkLocal(evs []*evt.Event) (drop []int64) {

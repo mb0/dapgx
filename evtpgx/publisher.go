@@ -1,6 +1,7 @@
 package evtpgx
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"strconv"
@@ -17,7 +18,7 @@ import (
 	"xelf.org/xelf/lit"
 )
 
-type applyFunc func(*publisher, dapgx.PC, []*evt.Event) error
+type applyFunc func(context.Context, *publisher, dapgx.PC, []*evt.Event) error
 
 type Publisher struct {
 	publisher
@@ -67,7 +68,8 @@ func (p *Publisher) Publish(t evt.Trans) (time.Time, []*evt.Event, error) {
 		}
 		evs = append(evs, &evt.Event{Rev: rev, Action: act})
 	}
-	err := dapgx.WithTx(p.DB, func(c dapgx.PC) error {
+	ctx := context.Background()
+	err := dapgx.WithTx(ctx, p.DB, func(c dapgx.PC) error {
 		cur, err := queryMaxRev(c)
 		if err != nil {
 			return fmt.Errorf("query max rev: %w", err)
@@ -77,7 +79,7 @@ func (p *Publisher) Publish(t evt.Trans) (time.Time, []*evt.Event, error) {
 		}
 		if check && len(keys) > 0 {
 			// query events with affected keys since base revision
-			diff, err := p.queryEvents(c, "WHERE rev > $1 AND key IN $2", t.Base, keys)
+			diff, err := p.queryEvents(ctx, c, "WHERE rev > $1 AND key IN $2", t.Base, keys)
 			if err != nil {
 				return err
 			}
@@ -85,13 +87,13 @@ func (p *Publisher) Publish(t evt.Trans) (time.Time, []*evt.Event, error) {
 				// TODO check for conflict
 			}
 		}
-		err = p.apply(&p.publisher, c, evs)
+		err = p.apply(ctx, &p.publisher, c, evs)
 		if err != nil {
 			log.Printf("apply failed %v", err)
 			return err
 		}
 		// insert audit
-		err = p.insertAudit(c, rev, t.Audit)
+		err = p.insertAudit(ctx, c, rev, t.Audit)
 		if err != nil {
 			log.Printf("insert audit failed %v", err)
 			return err
@@ -105,8 +107,8 @@ func (p *Publisher) Publish(t evt.Trans) (time.Time, []*evt.Event, error) {
 	return p.rev, evs, nil
 }
 
-func (p *publisher) insertAudit(c dapgx.PC, rev time.Time, d evt.Audit) error {
-	err := dapgx.Exec(dapgx.BG, c, `INSERT INTO evt.audit
+func (p *publisher) insertAudit(ctx context.Context, c dapgx.PC, rev time.Time, d evt.Audit) error {
+	err := dapgx.Exec(ctx, c, `INSERT INTO evt.audit
 		(rev, created, arrived, usr, extra) VALUES
 		($1, $2, $3, $4, $5)`, []lit.Val{
 		lit.Time(rev), lit.Time(d.Created), lit.Time(d.Arrived),
@@ -130,9 +132,9 @@ func scanOne(rows pgx.Rows, arg ...interface{}) error {
 	return rows.Err()
 }
 
-func insertEvents(p *publisher, c dapgx.PC, evs []*evt.Event) error {
+func insertEvents(ctx context.Context, p *publisher, c dapgx.PC, evs []*evt.Event) error {
 	for _, ev := range evs {
-		rows, err := dapgx.Query(dapgx.BG, c, `INSERT INTO evt.event
+		rows, err := dapgx.Query(ctx, c, `INSERT INTO evt.event
 			(rev, top, key, cmd, arg) VALUES
 			($1, $2, $3, $4, $5) returning id`, []lit.Val{
 			lit.Time(ev.Rev), lit.Str(ev.Top), lit.Str(ev.Key), lit.Str(ev.Cmd), ev.Arg,
@@ -148,17 +150,17 @@ func insertEvents(p *publisher, c dapgx.PC, evs []*evt.Event) error {
 	return nil
 }
 
-func applyAndInsertEvents(p *publisher, c dapgx.PC, evs []*evt.Event) error {
+func applyAndInsertEvents(ctx context.Context, p *publisher, c dapgx.PC, evs []*evt.Event) error {
 	for _, ev := range evs {
-		err := applyEvent(p, c, ev)
+		err := applyEvent(ctx, p, c, ev)
 		if err != nil {
 			return fmt.Errorf("apply event: %w", err)
 		}
 	}
-	return insertEvents(p, c, evs)
+	return insertEvents(ctx, p, c, evs)
 }
 
-func applyEvent(p *publisher, c dapgx.PC, ev *evt.Event) error {
+func applyEvent(ctx context.Context, p *publisher, c dapgx.PC, ev *evt.Event) error {
 	m := p.Project().Model(ev.Top)
 	if m == nil {
 		return fmt.Errorf("no model found for topic %s", ev.Top)
@@ -166,7 +168,7 @@ func applyEvent(p *publisher, c dapgx.PC, ev *evt.Event) error {
 	switch ev.Cmd {
 	case evt.CmdDel:
 		stmt := fmt.Sprintf("DELETE FROM %s WHERE id = $1", m.Qualified())
-		_, err := c.Exec(dapgx.BG, stmt, ev.Key)
+		_, err := c.Exec(ctx, stmt, ev.Key)
 		if err != nil {
 			return err
 		}
@@ -183,7 +185,7 @@ func applyEvent(p *publisher, c dapgx.PC, ev *evt.Event) error {
 		if err != nil {
 			return err
 		}
-		err = dapgx.Exec(dapgx.BG, c, qry, args)
+		err = dapgx.Exec(ctx, c, qry, args)
 		if err != nil {
 			return err
 		}
@@ -192,7 +194,7 @@ func applyEvent(p *publisher, c dapgx.PC, ev *evt.Event) error {
 		if err != nil {
 			return err
 		}
-		err = dapgx.Exec(dapgx.BG, c, qry, args)
+		err = dapgx.Exec(ctx, c, qry, args)
 		if err != nil {
 			return err
 		}

@@ -74,7 +74,7 @@ func TestRender(t *testing.T) {
 			t.Errorf("parse %s err: %v", test.el, err)
 			continue
 		}
-		p := exp.NewProg(reg, env, ast)
+		p := exp.NewProg(nil, reg, env, ast)
 		el, err := p.Resl(env, ast, typ.Void)
 		if err != nil {
 			t.Errorf("resolve %s err: %v", test.el, err)
