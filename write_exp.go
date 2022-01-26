@@ -25,7 +25,7 @@ func WriteExp(w *Writer, env exp.Env, e exp.Exp) error {
 		if l != nil {
 			return WriteVal(w, l.Type(), l)
 		}
-		return writeIdent(w, n)
+		return WriteIdent(w, n)
 	case *exp.Call:
 		return WriteCall(w, env, v)
 	case *exp.Lit:
@@ -675,12 +675,15 @@ func zeroStrings(t typ.Type) (zero, alt string, _ error) {
 	return
 }
 
-func writeIdent(w *Writer, name string) error {
-	name, ok := Unreserved(name)
-	if ok {
-		return w.Fmt(name)
+func WriteIdent(w bfr.Writer, name string) (err error) {
+	if name, ok := Unreserved(name); ok {
+		_, err = w.WriteString(name)
+	} else {
+		w.WriteByte('"')
+		w.WriteString(name)
+		err = w.WriteByte('"')
 	}
-	return w.Fmt("\"%s\"", name)
+	return err
 }
 
 // Unreserved returns the lowercase key and whether it is an unreserved identifier.

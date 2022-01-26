@@ -18,6 +18,7 @@ const fooRaw = `(schema foo
 	(Node3; (ID:int pk;) Group:str Name:str uniq:['group' 'name'])
 	(Node4; (ID:int pk;) @Node2.ID)
 	(Node5; (ID:int pk;) (Val:bool def:false))
+	(Node6; @Kind)
 )`
 
 func TestWriteTable(t *testing.T) {
@@ -41,6 +42,7 @@ func TestWriteTable(t *testing.T) {
 			"\tnode2 int8 not null references foo.node2 deferrable\n);"},
 		{"node5", "CREATE TABLE foo.node5 (\n\tid int8 primary key,\n" +
 			"\tval bool not null default false\n);"},
+		{"node6", "CREATE TABLE foo.node6 (\n\tkind foo.kind not null\n);"},
 	}
 	for _, test := range tests {
 		var b strings.Builder

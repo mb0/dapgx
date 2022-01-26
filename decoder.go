@@ -25,6 +25,10 @@ type Decoder func(raw []byte, reg *lit.Reg) (lit.Val, error)
 
 // FieldDecoder returns a decoder for the given field description fd.
 func FieldDecoder(oid uint32, bin bool) (res Decoder) {
+	if oid > pgtype.Int8rangeOID { // this is the max common oid pgtype knows about
+		// we may have an enum so lets text decoders
+		oid = pgtype.TextOID
+	}
 	decs, ok := decmap[oid]
 	if ok {
 		if bin {

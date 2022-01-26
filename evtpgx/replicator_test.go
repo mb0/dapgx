@@ -28,6 +28,7 @@ func TestReplicator(t *testing.T) {
 		}}},
 		{Sig: evt.Sig{"person.person", "25"}, Cmd: evt.CmdNew, Arg: &lit.Dict{Keyed: []lit.KeyVal{
 			{Key: "name", Val: lit.Str("Me")},
+			{Key: "gender", Val: lit.Str("m")},
 			{Key: "family", Val: lit.Int(1)},
 		}}},
 	}})

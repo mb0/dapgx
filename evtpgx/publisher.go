@@ -187,7 +187,7 @@ func applyEvent(ctx context.Context, p *publisher, c dapgx.PC, ev *evt.Event) er
 		}
 		err = dapgx.Exec(ctx, c, qry, args)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed insert err: %v\nfor query: %s\nargs: %s", err, qry, ev.Arg)
 		}
 	case evt.CmdMod:
 		qry, args, err := p.updateObj(m, ev)
@@ -213,7 +213,7 @@ func insertObj(m *dom.Model) string {
 		if i > 0 {
 			b.WriteString(", ")
 		}
-		b.WriteString(f.Key())
+		dapgx.WriteIdent(&b, f.Key())
 	}
 	b.WriteString(") VALUES (")
 	for i := range m.Elems {

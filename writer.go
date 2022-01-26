@@ -8,6 +8,7 @@ import (
 	"xelf.org/xelf/bfr"
 	"xelf.org/xelf/cor"
 	"xelf.org/xelf/exp"
+	"xelf.org/xelf/knd"
 	"xelf.org/xelf/lit"
 	"xelf.org/xelf/typ"
 )
@@ -74,4 +75,15 @@ func (ee ExpEnv) Translate(p *exp.Prog, env exp.Env, s *exp.Sym) (string, lit.Va
 		return n, nil, nil
 	}
 	return s.Sym, nil, External
+}
+
+func ColKey(key string, t typ.Type) (string, error) {
+	if key == "" {
+		switch t.Kind & knd.Data {
+		case knd.Obj:
+		default:
+			return "", fmt.Errorf("unexpected embedded field type %s", t)
+		}
+	}
+	return key, nil
 }

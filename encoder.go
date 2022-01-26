@@ -15,12 +15,24 @@ import (
 	"github.com/jackc/pgio"
 	"github.com/jackc/pgtype"
 	"xelf.org/xelf/cor"
+	"xelf.org/xelf/knd"
 	"xelf.org/xelf/lit"
 )
 
 func FieldEncoder(oid uint32, arg lit.Val) (encoder, error) {
 	if arg == nil || arg.Nil() {
 		return WrapNull{}, nil
+	}
+	if oid > pgtype.Int8rangeOID { // this is the max common oid pgtype knows about
+		// we may have an enum so lets use the arg type as hint
+		k := arg.Type().Kind
+		switch {
+		case k&knd.Char != 0:
+			return WrapStr(arg.String()), nil
+		case k&knd.Int != 0:
+			a, err := lit.ToInt(arg)
+			return WrapInt8(a), err
+		}
 	}
 	switch oid {
 	case pgtype.BoolOID:
@@ -67,7 +79,6 @@ func FieldEncoder(oid uint32, arg lit.Val) (encoder, error) {
 		return WrapJSON{arg}, nil
 	case pgtype.JSONBOID:
 		return WrapJSONB{arg}, nil
-
 	}
 	if idxr, ok := arg.(lit.Idxr); ok {
 		var coid int32

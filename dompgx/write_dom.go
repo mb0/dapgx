@@ -144,17 +144,12 @@ func checkIdent(name string) string {
 }
 
 func writeField(w *dapgx.Writer, p typ.Param, el *dom.Elem) error {
-	key := p.Key
+	key, err := dapgx.ColKey(p.Key, p.Type)
+	if err != nil {
+		return err
+	}
 	if key == "" {
-		switch p.Type.Kind & knd.Any {
-		case knd.Bits, knd.Enum:
-			split := strings.Split(typ.Name(p.Type), ".")
-			key = split[len(split)-1]
-		case knd.Obj:
-			return writeEmbed(w, p.Type)
-		default:
-			return fmt.Errorf("unexpected embedded field type %s", p.Type)
-		}
+		return writeEmbed(w, p.Type)
 	}
 	w.Fmt(checkIdent(key))
 	w.Byte(' ')
@@ -168,7 +163,6 @@ func writeField(w *dapgx.Writer, p typ.Param, el *dom.Elem) error {
 		w.Fmt(ts)
 	}
 	if el.Bits&dom.BitPK != 0 {
-
 		w.Fmt(" primary key")
 		// TODO auto
 	}
