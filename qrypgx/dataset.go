@@ -37,7 +37,7 @@ func (b *Backend) Stream(key string) (mig.Stream, error) {
 }
 
 func openRowsIter(db *pgxpool.Pool, m *dom.Model) (*rowsIter, error) {
-	res, err := lit.NewStrc(&lit.Reg{}, m.Type())
+	res, err := lit.NewObj(&lit.Reg{}, m.Type())
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +61,7 @@ func openRowsIter(db *pgxpool.Pool, m *dom.Model) (*rowsIter, error) {
 
 type rowsIter struct {
 	pgx.Rows
-	res  *lit.Strc
+	res  *lit.Obj
 	args []interface{}
 }
 
@@ -70,7 +70,7 @@ func (it *rowsIter) Scan() (lit.Val, error) {
 		return nil, io.EOF
 	}
 	val, _ := it.res.New()
-	res := val.(*lit.Strc)
+	res := val.(*lit.Obj)
 	if it.args == nil {
 		it.args = make([]interface{}, len(res.Vals))
 	}

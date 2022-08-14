@@ -39,7 +39,7 @@ func WriteExp(w *Writer, env exp.Env, e exp.Exp) error {
 // expression in postgresql. Custom resolvers can be rendered to sql by detecting
 // and handling them before calling this function.
 func WriteCall(w *Writer, env exp.Env, e *exp.Call) error {
-	key := cor.Keyed(exp.SigName(e.Sig))
+	key := cor.Keyed(e.Sig.Ref)
 	r := exprWriterMap[key]
 	if r != nil {
 		return r.WriteCall(w, env, e)
@@ -667,7 +667,7 @@ func zeroStrings(t typ.Type) (zero, alt string, _ error) {
 		fallthrough
 	case knd.Idxr:
 		zero, alt = "'null'", "'[]'"
-	case knd.Keyr, knd.Dict, knd.Rec, knd.Obj:
+	case knd.Keyr, knd.Dict, knd.Obj:
 		zero, alt = "'null'", "'{}'"
 	default:
 		return "", "", fmt.Errorf("error unexpected type %s", t)

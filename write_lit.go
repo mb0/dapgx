@@ -22,9 +22,7 @@ func TypString(t typ.Type) (string, error) {
 	case knd.Char, knd.Str:
 		return "text", nil
 	case knd.Enum:
-		b := t.Body.(*typ.ConstBody)
-		// TODO better conversion check for reserved names
-		return strings.ToLower(b.Name), nil
+		return strings.ToLower(t.Ref), nil
 	case knd.Raw:
 		return "bytea", nil
 	case knd.UUID:
@@ -33,7 +31,7 @@ func TypString(t typ.Type) (string, error) {
 		return "timestamptz", nil
 	case knd.Span:
 		return "interval", nil
-	case knd.Any, knd.All, knd.Data, knd.Keyr, knd.Strc, knd.Dict, knd.Rec, knd.Obj:
+	case knd.Any, knd.All, knd.Data, knd.Keyr, knd.Dict, knd.Obj:
 		return "jsonb", nil
 	case knd.List, knd.Idxr:
 		if n := typ.ContEl(t); n.Kind&knd.Prim == n.Kind {

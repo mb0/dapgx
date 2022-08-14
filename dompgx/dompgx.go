@@ -149,7 +149,7 @@ func (c *litCopySrc) Values() ([]interface{}, error) {
 			}
 			vs = append(vs, vp)
 		}
-		el = &lit.Strc{c.reg, c.m.Type(), vs}
+		el = &lit.Obj{Reg: c.reg, Typ: c.m.Type(), Vals: vs}
 	}
 	err = prx.Assign(el)
 	if err != nil {

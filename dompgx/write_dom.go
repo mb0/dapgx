@@ -200,14 +200,14 @@ func writeField(w *dapgx.Writer, p typ.Param, el *dom.Elem) error {
 }
 
 func writeEmbed(w *dapgx.Writer, t typ.Type) error {
-	ref := typ.Name(t)
+	ref := t.Ref
 	ps := strings.Split(ref, ".")
 	if len(ps) > 1 {
 		ref = ps[0] + "." + cor.Keyed(ps[1])
 	}
 	m := w.Project.Model(ref)
 	if m == nil {
-		return fmt.Errorf("no model for %s", typ.Name(t))
+		return fmt.Errorf("no model for %s", t.Ref)
 	}
 	for i, p := range m.Params() {
 		if i > 0 {
