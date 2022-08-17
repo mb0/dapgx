@@ -188,13 +188,19 @@ func writeField(w *dapgx.Writer, p typ.Param, el *dom.Elem) error {
 			w.Fmt(" default 0")
 		}
 	}
-	if el.Ref != "" {
-		m := w.Project.Model(strings.ToLower(el.Ref))
-		if m == nil {
-			return fmt.Errorf("no model for %s", el.Ref)
+	if el.Bits&dom.BitPK == 0 && el.Type.Ref != "" {
+		ref := strings.ToLower(el.Type.Ref)
+		if strings.HasSuffix(ref, ".id") {
+			ref = ref[:len(ref)-3]
+			m := w.Project.Model(ref)
+			if m == nil {
+				return fmt.Errorf("no model for %s", ref)
+			}
+			if m.Kind.Kind == knd.Obj {
+				name := fmt.Sprintf("%s.%s", m.Schema, checkIdent(m.Key()))
+				w.Fmt(" references %s deferrable", name)
+			}
 		}
-		name := fmt.Sprintf("%s.%s", m.Schema, checkIdent(m.Key()))
-		w.Fmt(" references %s deferrable", name)
 	}
 	return nil
 }
