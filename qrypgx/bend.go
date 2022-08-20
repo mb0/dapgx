@@ -37,7 +37,7 @@ func New(db *pgxpool.Pool, proj *dom.Project) *Backend {
 }
 
 func (b *Backend) Proj() *dom.Project { return b.Project }
-func (b *Backend) Exec(p *exp.Prog, j *qry.Job) (lit.Val, error) {
+func (b *Backend) Exec(p *exp.Prog, j *qry.Job) (*exp.Lit, error) {
 	if j.Val != nil {
 		return j.Val, nil
 	}
@@ -87,7 +87,8 @@ func (b *Backend) execQuery(p *exp.Prog, q *Query) error {
 		if err != nil {
 			return fmt.Errorf("query %s: %w", qs, err)
 		}
-		q.Val = mut
+
+		q.Val = &exp.Lit{Res: q.Res, Val: mut}
 		scan := dapgx.ScanMany
 		if q.Kind&KindMany == 0 {
 			scan = dapgx.ScanOne
