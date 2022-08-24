@@ -109,16 +109,10 @@ func (e *unresEnv) add(t typ.Type, names ...string) {
 }
 func (e *unresEnv) Parent() exp.Env { return e.Par }
 func (e *unresEnv) Dyn() exp.Spec   { return e.Par.Dyn() }
-func (e *unresEnv) Resl(p *exp.Prog, s *exp.Sym, k string) (exp.Exp, error) {
-	if k == "" {
-		k = s.Sym
-	}
+func (e *unresEnv) Resl(p *exp.Prog, s *exp.Sym, k string, eval bool) (exp.Exp, error) {
 	if t, ok := e.Map[k]; ok {
 		s.Type = t
 		return s, nil
 	}
-	return e.Par.Resl(p, s, k)
-}
-func (e *unresEnv) Eval(p *exp.Prog, s *exp.Sym, k string) (*exp.Lit, error) {
-	return e.Par.Eval(p, s, k)
+	return e.Par.Resl(p, s, k, eval)
 }

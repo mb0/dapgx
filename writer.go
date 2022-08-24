@@ -63,7 +63,7 @@ type Translator interface {
 type ExpEnv struct{}
 
 func (ee ExpEnv) Translate(p *exp.Prog, env exp.Env, s *exp.Sym) (string, lit.Val, error) {
-	_, err := env.Resl(p, s, s.Sym)
+	_, err := env.Resl(p, s, s.Sym, false)
 	if err != nil {
 		return "", nil, err
 	}
