@@ -62,19 +62,22 @@ type Translator interface {
 
 type ExpEnv struct{}
 
-func (ee ExpEnv) Translate(p *exp.Prog, env exp.Env, s *exp.Sym) (string, lit.Val, error) {
-	_, err := env.Resl(p, s, s.Sym, false)
+func (ee ExpEnv) Translate(p *exp.Prog, env exp.Env, s *exp.Sym) (n string, v lit.Val, err error) {
+	x, err := env.Lookup(s, s.Sym, true)
 	if err != nil {
 		return "", nil, err
 	}
-	n := s.Sym
+	n = s.Sym
 	if n[0] == '.' {
 		n = n[1:]
 	}
 	if cor.IsKey(n) {
 		return n, nil, nil
 	}
-	return s.Sym, nil, External
+	if l := x.(*exp.Lit); l != nil {
+		v = l.Val
+	}
+	return s.Sym, v, External
 }
 
 func ColKey(key string, t typ.Type) (string, error) {

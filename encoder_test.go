@@ -26,7 +26,7 @@ func TestTime(t *testing.T) {
 		same(pgtype.TimestamptzOID, time.Date(2022, 1, 1, 0, 0, 0, 0, time.Local)),
 		same(pgtype.DateOID, time.Date(2022, 1, 1, 0, 0, 0, 0, time.Local)),
 	}
-	reg := &lit.Reg{}
+	reg := &lit.Reg{Cache: &lit.Cache{}}
 	for _, test := range tests {
 		enc, err := FieldEncoder(test.oid, lit.Time(test.time))
 		if err != nil {

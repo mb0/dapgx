@@ -115,7 +115,7 @@ func (r *Replicator) PublishLocal(data evt.Trans) (lrev time.Time, evs []*evt.Ev
 			lit.Time(t.Arrived),
 			lit.Str(t.Usr),
 			t.Extra,
-			r.Reg.MustProxy(&t.Acts),
+			lit.MustProxy(r.Reg, &t.Acts),
 		})
 		if err != nil {
 			return err

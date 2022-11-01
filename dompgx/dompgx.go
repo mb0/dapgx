@@ -90,16 +90,16 @@ func dropProject(ctx context.Context, tx dapgx.C, p *dom.Project) error {
 	return nil
 }
 
-func CopyFrom(ctx context.Context, db *pgxpool.Pool, reg *lit.Reg, s *dom.Schema, fix *lit.Dict) error {
+func CopyFrom(ctx context.Context, db *pgxpool.Pool, reg *lit.Reg, s *dom.Schema, fix lit.Keyed) error {
 	return dapgx.WithTx(ctx, db, func(tx dapgx.PC) error {
-		for _, kv := range fix.Keyed {
+		for _, kv := range fix {
 			m := s.Model(kv.Key)
 			cols := make([]string, 0, len(m.Elems))
 			for _, f := range m.Elems {
 				cols = append(cols, cor.Keyed(f.Name))
 			}
 			_, err := tx.CopyFrom(ctx, pgx.Identifier{m.Qual(), m.Key()}, cols, &litCopySrc{
-				List: kv.Val.(*lit.List), reg: reg, m: m,
+				Vals: *kv.Val.(*lit.Vals), reg: reg, m: m,
 			})
 			if err != nil {
 				return fmt.Errorf("copy from: %w", err)
@@ -110,7 +110,7 @@ func CopyFrom(ctx context.Context, db *pgxpool.Pool, reg *lit.Reg, s *dom.Schema
 }
 
 type litCopySrc struct {
-	*lit.List
+	lit.Vals
 	reg *lit.Reg
 	m   *dom.Model
 	nxt int
@@ -133,9 +133,9 @@ func (c *litCopySrc) Values() ([]interface{}, error) {
 		c.err = err
 		return nil, err
 	}
-	if l, ok := el.(*lit.List); ok {
-		vs := make([]lit.Val, 0, len(l.Vals))
-		for i, v := range l.Vals {
+	if l, ok := el.(*lit.Vals); ok {
+		vs := make([]lit.Val, 0, len(*l))
+		for i, v := range *l {
 			p := c.m.Elems[i]
 			vp, err := c.reg.Zero(p.Type)
 			if err != nil {

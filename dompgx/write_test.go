@@ -22,7 +22,7 @@ const fooRaw = `(schema foo
 )`
 
 func TestWriteTable(t *testing.T) {
-	reg := &lit.Reg{}
+	reg := &lit.Reg{Cache: &lit.Cache{}}
 	s, err := dom.ReadSchema(reg, strings.NewReader(fooRaw), "foo", nil)
 	if err != nil {
 		t.Fatalf("schema foo error %v", err)

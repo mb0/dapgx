@@ -65,7 +65,7 @@ func (l *ledger) queryEvents(ctx context.Context, c dapgx.C, whr string, args ..
 		return nil, err
 	}
 	defer rows.Close()
-	err = dapgx.ScanMany(l.Reg, false, l.Reg.MustProxy(&res), rows)
+	err = dapgx.ScanMany(l.Reg, false, lit.MustProxy(l.Reg, &res), rows)
 	if err != nil {
 		return nil, err
 	}

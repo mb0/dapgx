@@ -45,7 +45,7 @@ func TestQry(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	reg := &lit.Reg{}
+	reg := &lit.Reg{Cache: &lit.Cache{}}
 	b, err := getBackend(reg, db)
 	if err != nil {
 		t.Fatal(err)
@@ -90,7 +90,7 @@ func TestQry(t *testing.T) {
 		{`(*prod.prod (ge .id 25) + catn:(?prod.cat (eq .id ..cat) _:name))`,
 			`[{id:25 name:'Y' cat:1 catn:'a'} {id:26 name:'Z' cat:1 catn:'a'}]`},
 	}
-	param := &lit.Dict{Keyed: []lit.KeyVal{
+	param := lit.MakeObj(reg, []lit.KeyVal{
 		{Key: "int1", Val: lit.Int(1)},
 		{Key: "strA", Val: lit.Str("a")},
 		{Key: "list", Val: &lit.List{Reg: reg, El: typ.Str, Vals: []lit.Val{
@@ -98,7 +98,7 @@ func TestQry(t *testing.T) {
 			lit.Str("b"),
 			lit.Str("c"),
 		}}},
-	}}
+	})
 	qry := qry.New(reg, extlib.Std, b)
 	for _, test := range tests {
 		start := time.Now()

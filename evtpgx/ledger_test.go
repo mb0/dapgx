@@ -22,7 +22,7 @@ var _ evt.Ledger = (*ledger)(nil)
 
 func testSetup(t *testing.T) (*lit.Reg, *dom.Project, *pgxpool.Pool) {
 	t.Helper()
-	reg := &lit.Reg{}
+	reg := &lit.Reg{Cache: &lit.Cache{}}
 	pr, err := testProject(reg)
 	if err != nil {
 		t.Fatalf("setup project %v", err)

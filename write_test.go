@@ -11,6 +11,7 @@ import (
 )
 
 func TestRender(t *testing.T) {
+	reg := &lit.Reg{Cache: &lit.Cache{}}
 	tests := []struct {
 		el   string
 		want string
@@ -68,21 +69,20 @@ func TestRender(t *testing.T) {
 	env.add(typ.List, "s")
 	env.add(typ.ListOf(typ.Int), "t")
 	for _, test := range tests {
-		reg := &lit.Reg{}
 		ast, err := exp.Parse(reg, test.el)
 		if err != nil {
 			t.Errorf("parse %s err: %v", test.el, err)
 			continue
 		}
-		p := exp.NewProg(nil, reg, env, ast)
-		el, err := p.Resl(env, ast, typ.Void)
+		p := exp.NewProg(nil, reg, env)
+		el, err := p.Resl(p, ast, typ.Void)
 		if err != nil {
 			t.Errorf("resolve %s err: %v", test.el, err)
 			continue
 		}
 		var b strings.Builder
 		w := NewWriter(&b, nil, p, ExpEnv{})
-		err = WriteExp(w, env, el)
+		err = WriteExp(w, p, el)
 		if err != nil {
 			t.Errorf("render %s err: %+v", test.el, err)
 			continue
@@ -108,11 +108,10 @@ func (e *unresEnv) add(t typ.Type, names ...string) {
 	}
 }
 func (e *unresEnv) Parent() exp.Env { return e.Par }
-func (e *unresEnv) Dyn() exp.Spec   { return e.Par.Dyn() }
-func (e *unresEnv) Resl(p *exp.Prog, s *exp.Sym, k string, eval bool) (exp.Exp, error) {
+func (e *unresEnv) Lookup(s *exp.Sym, k string, eval bool) (exp.Exp, error) {
 	if t, ok := e.Map[k]; ok {
 		s.Type = t
 		return s, nil
 	}
-	return e.Par.Resl(p, s, k, eval)
+	return e.Par.Lookup(s, k, eval)
 }
