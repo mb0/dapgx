@@ -6,12 +6,10 @@ import (
 
 	"xelf.org/xelf/exp"
 	"xelf.org/xelf/lib"
-	"xelf.org/xelf/lit"
 	"xelf.org/xelf/typ"
 )
 
 func TestRender(t *testing.T) {
-	reg := &lit.Reg{Cache: &lit.Cache{}}
 	tests := []struct {
 		el   string
 		want string
@@ -69,12 +67,12 @@ func TestRender(t *testing.T) {
 	env.add(typ.List, "s")
 	env.add(typ.ListOf(typ.Int), "t")
 	for _, test := range tests {
-		ast, err := exp.Parse(reg, test.el)
+		ast, err := exp.Parse(test.el)
 		if err != nil {
 			t.Errorf("parse %s err: %v", test.el, err)
 			continue
 		}
-		p := exp.NewProg(nil, reg, env)
+		p := exp.NewProg(nil, nil, env)
 		el, err := p.Resl(p, ast, typ.Void)
 		if err != nil {
 			t.Errorf("resolve %s err: %v", test.el, err)

@@ -377,13 +377,13 @@ func intervalBinDec(raw []byte, _ *lit.Reg) (lit.Val, error) {
 }
 
 func jsonDec(raw []byte, reg *lit.Reg) (lit.Val, error) {
-	return lit.Read(reg, bytes.NewReader(raw), "json")
+	return lit.Read(bytes.NewReader(raw), "json")
 }
 func jsonbDec(raw []byte, reg *lit.Reg) (lit.Val, error) {
 	if len(raw) == 0 || raw[0] != 1 {
 		return nil, fmt.Errorf("invalid jsonb version")
 	}
-	return lit.Read(reg, bytes.NewReader(raw[1:]), "jsonb")
+	return lit.Read(bytes.NewReader(raw[1:]), "jsonb")
 }
 
 func arrayDecs(txt, bin Decoder, t typ.Type) DecoderPair {

@@ -84,7 +84,7 @@ func TestGenQuery(t *testing.T) {
 	}
 	q := qry.New(reg, extlib.Std, b)
 	for _, test := range tests {
-		ast, err := exp.Parse(reg, test.raw)
+		ast, err := exp.Parse(test.raw)
 		if err != nil {
 			t.Errorf("parse %s error: %v", test.raw, err)
 			continue

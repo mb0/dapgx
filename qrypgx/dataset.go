@@ -37,7 +37,7 @@ func (b *Backend) Stream(key string) (mig.Stream, error) {
 }
 
 func openRowsIter(db *pgxpool.Pool, m *dom.Model) (*rowsIter, error) {
-	res, err := lit.NewObj(&lit.Reg{}, m.Type())
+	res, err := lit.NewObj(m.Type())
 	if err != nil {
 		return nil, err
 	}
