@@ -43,19 +43,19 @@ func testSetup(t *testing.T) (*lit.Reg, *dom.Project, *pgxpool.Pool) {
 }
 
 func testProject(reg *lit.Reg) (*dom.Project, error) {
+	mig, err := dom.ReadSchema(nil, strings.NewReader(mig.RawSchema()), "mig.daql")
+	if err != nil {
+		return nil, err
+	}
+	ev, err := dom.ReadSchema(nil, strings.NewReader(evt.RawSchema()), "evt.daql")
+	if err != nil {
+		return nil, err
+	}
+	pr, err := dom.ReadSchema(nil, strings.NewReader(domtest.PersonRaw), "person.daql")
+	if err != nil {
+		return nil, err
+	}
 	p := &dom.Project{}
-	mig, err := dom.ReadSchema(reg, strings.NewReader(mig.RawSchema()), "mig.daql", nil)
-	if err != nil {
-		return nil, err
-	}
-	ev, err := dom.ReadSchema(reg, strings.NewReader(evt.RawSchema()), "evt.daql", nil)
-	if err != nil {
-		return nil, err
-	}
-	pr, err := dom.ReadSchema(reg, strings.NewReader(domtest.PersonRaw), "person.daql", nil)
-	if err != nil {
-		return nil, err
-	}
 	p.Schemas = append(p.Schemas, mig, ev, pr)
 	return p, nil
 }

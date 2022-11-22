@@ -7,7 +7,6 @@ import (
 	"xelf.org/dapgx"
 	"xelf.org/daql/dom"
 	"xelf.org/xelf/bfr"
-	"xelf.org/xelf/lit"
 )
 
 const fooRaw = `(schema foo
@@ -22,8 +21,7 @@ const fooRaw = `(schema foo
 )`
 
 func TestWriteTable(t *testing.T) {
-	reg := &lit.Reg{Cache: &lit.Cache{}}
-	s, err := dom.ReadSchema(reg, strings.NewReader(fooRaw), "foo", nil)
+	s, err := dom.ReadSchema(nil, strings.NewReader(fooRaw), "foo")
 	if err != nil {
 		t.Fatalf("schema foo error %v", err)
 	}
