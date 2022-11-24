@@ -14,7 +14,7 @@ import (
 	"xelf.org/xelf/lit"
 )
 
-func NewLedger(db *pgxpool.Pool, pr *dom.Project, reg *lit.Reg) (evt.Ledger, error) {
+func NewLedger(db *pgxpool.Pool, pr *dom.Project, reg *lit.Regs) (evt.Ledger, error) {
 	l, err := newLedger(db, pr, reg)
 	if err != nil {
 		return nil, err
@@ -24,13 +24,13 @@ func NewLedger(db *pgxpool.Pool, pr *dom.Project, reg *lit.Reg) (evt.Ledger, err
 
 type ledger struct {
 	*qrypgx.Backend
-	Reg *lit.Reg
+	Reg lit.Regs
 	rev time.Time
 }
 
-func newLedger(db *pgxpool.Pool, pr *dom.Project, reg *lit.Reg) (ledger, error) {
+func newLedger(db *pgxpool.Pool, pr *dom.Project, reg *lit.Regs) (ledger, error) {
 	rev, err := queryMaxRev(db)
-	return ledger{qrypgx.New(db, pr), reg, rev}, err
+	return ledger{qrypgx.New(db, pr), *lit.DefaultRegs(reg), rev}, err
 }
 
 func (l *ledger) Rev() time.Time        { return l.rev }

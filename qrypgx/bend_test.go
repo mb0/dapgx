@@ -19,7 +19,7 @@ import (
 
 var testDsn = "host=/var/run/postgresql dbname=daql"
 
-func getBackend(reg *lit.Reg, db *pgxpool.Pool) (qry.Backend, error) {
+func getBackend(reg *lit.Regs, db *pgxpool.Pool) (qry.Backend, error) {
 	f := domtest.Must(domtest.ProdFixture(reg))
 	if db != nil {
 		ctx := context.Background()
@@ -45,7 +45,7 @@ func TestQry(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	reg := &lit.Reg{Cache: &lit.Cache{}}
+	reg := lit.NewRegs()
 	b, err := getBackend(reg, db)
 	if err != nil {
 		t.Fatal(err)

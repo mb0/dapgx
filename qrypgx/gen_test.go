@@ -12,7 +12,7 @@ import (
 )
 
 func TestGenQuery(t *testing.T) {
-	reg := &lit.Reg{Cache: &lit.Cache{}}
+	reg := lit.NewRegs()
 	f := domtest.Must(domtest.ProdFixture(reg))
 	b := New(nil, &f.Project)
 	tests := []struct {
@@ -90,7 +90,7 @@ func TestGenQuery(t *testing.T) {
 			continue
 		}
 		d := &qry.Doc{Qry: q}
-		c := exp.NewProg(nil, reg, d)
+		c := exp.NewProg(d, reg)
 		_, err = c.Resl(c, ast, typ.Void)
 		if err != nil {
 			t.Errorf("resolve %s error %+v", test.raw, err)

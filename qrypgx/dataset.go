@@ -69,8 +69,7 @@ func (it *rowsIter) Scan() (lit.Val, error) {
 	if !it.Next() {
 		return nil, io.EOF
 	}
-	val, _ := it.res.New()
-	res := val.(*lit.Obj)
+	res := it.res.New().(*lit.Obj)
 	if it.args == nil {
 		it.args = make([]interface{}, len(res.Vals))
 	}

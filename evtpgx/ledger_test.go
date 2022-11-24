@@ -20,10 +20,10 @@ var testDsn = "host=/var/run/postgresql dbname=daql"
 
 var _ evt.Ledger = (*ledger)(nil)
 
-func testSetup(t *testing.T) (*lit.Reg, *dom.Project, *pgxpool.Pool) {
+func testSetup(t *testing.T) (*lit.Regs, *dom.Project, *pgxpool.Pool) {
 	t.Helper()
-	reg := &lit.Reg{Cache: &lit.Cache{}}
-	pr, err := testProject(reg)
+	reg := lit.NewRegs()
+	pr, err := testProject()
 	if err != nil {
 		t.Fatalf("setup project %v", err)
 	}
@@ -42,7 +42,7 @@ func testSetup(t *testing.T) (*lit.Reg, *dom.Project, *pgxpool.Pool) {
 	return reg, pr, db
 }
 
-func testProject(reg *lit.Reg) (*dom.Project, error) {
+func testProject() (*dom.Project, error) {
 	mig, err := dom.ReadSchema(nil, strings.NewReader(mig.RawSchema()), "mig.daql")
 	if err != nil {
 		return nil, err

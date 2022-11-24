@@ -90,7 +90,7 @@ func dropProject(ctx context.Context, tx dapgx.C, p *dom.Project) error {
 	return nil
 }
 
-func CopyFrom(ctx context.Context, db *pgxpool.Pool, reg *lit.Reg, s *dom.Schema, fix lit.Keyed) error {
+func CopyFrom(ctx context.Context, db *pgxpool.Pool, reg *lit.Regs, s *dom.Schema, fix lit.Keyed) error {
 	return dapgx.WithTx(ctx, db, func(tx dapgx.PC) error {
 		for _, kv := range fix {
 			m := s.Model(kv.Key)
@@ -111,7 +111,7 @@ func CopyFrom(ctx context.Context, db *pgxpool.Pool, reg *lit.Reg, s *dom.Schema
 
 type litCopySrc struct {
 	lit.Vals
-	reg *lit.Reg
+	reg *lit.Regs
 	m   *dom.Model
 	nxt int
 	err error
@@ -128,20 +128,12 @@ func (c *litCopySrc) Values() ([]interface{}, error) {
 		c.err = err
 		return nil, err
 	}
-	prx, err := c.reg.Zero(c.m.Type())
-	if err != nil {
-		c.err = err
-		return nil, err
-	}
+	prx := c.reg.Zero(c.m.Type())
 	if l, ok := el.(*lit.Vals); ok {
 		vs := make([]lit.Val, 0, len(*l))
 		for i, v := range *l {
 			p := c.m.Elems[i]
-			vp, err := c.reg.Zero(p.Type)
-			if err != nil {
-				c.err = err
-				return nil, c.err
-			}
+			vp := c.reg.Zero(p.Type)
 			err = vp.Assign(v)
 			if err != nil {
 				c.err = err

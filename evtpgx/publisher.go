@@ -30,13 +30,13 @@ type publisher struct {
 	apply  applyFunc
 }
 
-func NewPublisher(db *pgxpool.Pool, pr *dom.Project, reg *lit.Reg) (*Publisher, error) {
+func NewPublisher(db *pgxpool.Pool, pr *dom.Project, reg *lit.Regs) (*Publisher, error) {
 	return newPublisher(db, pr, reg, insertEvents)
 }
-func NewStatefulPublisher(db *pgxpool.Pool, pr *dom.Project, reg *lit.Reg) (*Publisher, error) {
+func NewStatefulPublisher(db *pgxpool.Pool, pr *dom.Project, reg *lit.Regs) (*Publisher, error) {
 	return newPublisher(db, pr, reg, applyAndInsertEvents)
 }
-func newPublisher(db *pgxpool.Pool, pr *dom.Project, reg *lit.Reg, a applyFunc) (*Publisher, error) {
+func newPublisher(db *pgxpool.Pool, pr *dom.Project, reg *lit.Regs, a applyFunc) (*Publisher, error) {
 	l, err := newLedger(db, pr, reg)
 	if err != nil {
 		return nil, err

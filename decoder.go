@@ -21,7 +21,7 @@ import (
 )
 
 // Decoder is a function to decode either a text or binary postgres result to a literal.
-type Decoder func(raw []byte, reg *lit.Reg) (lit.Val, error)
+type Decoder func([]byte) (lit.Val, error)
 
 // FieldDecoder returns a decoder for the given field description fd.
 func FieldDecoder(oid uint32, bin bool) (res Decoder) {
@@ -91,7 +91,7 @@ var decmap = map[uint32]DecoderPair{
 	pgtype.JSONBArrayOID:       arrayDecs(jsonDec, jsonbDec, typ.Data),
 }
 
-func errDecoder(raw []byte, _ *lit.Reg) (lit.Val, error) {
+func errDecoder(raw []byte) (lit.Val, error) {
 	return nil, fmt.Errorf("decoder not implemented")
 }
 
@@ -99,23 +99,23 @@ func errDecoder(raw []byte, _ *lit.Reg) (lit.Val, error) {
 // we handle null checks outside of the decoder, and use a local timezone for date and timestamp.
 // we also reimplemented the text array parser to use less allocations.
 
-func boolTextDec(raw []byte, _ *lit.Reg) (lit.Val, error) {
+func boolTextDec(raw []byte) (lit.Val, error) {
 	if len(raw) != 1 {
 		return nil, fmt.Errorf("invalid length for bool: %d", len(raw))
 	}
 	return lit.Bool(raw[0] == 't'), nil
 }
-func boolBinDec(raw []byte, _ *lit.Reg) (lit.Val, error) {
+func boolBinDec(raw []byte) (lit.Val, error) {
 	if len(raw) != 1 {
 		return nil, fmt.Errorf("invalid length for bool: %d", len(raw))
 	}
 	return lit.Bool(raw[0] == 1), nil
 }
 
-func rawBinDec(raw []byte, _ *lit.Reg) (lit.Val, error) {
+func rawBinDec(raw []byte) (lit.Val, error) {
 	return lit.Raw(raw), nil
 }
-func rawTextDec(raw []byte, _ *lit.Reg) (lit.Val, error) {
+func rawTextDec(raw []byte) (lit.Val, error) {
 	if !bytes.HasPrefix(raw, []byte(`\x`)) {
 		return nil, fmt.Errorf("invalid hex format")
 	}
@@ -123,41 +123,41 @@ func rawTextDec(raw []byte, _ *lit.Reg) (lit.Val, error) {
 	return lit.Raw(raw[:n]), err
 }
 
-func intTextDec(raw []byte, _ *lit.Reg) (lit.Val, error) {
+func intTextDec(raw []byte) (lit.Val, error) {
 	n, err := strconv.ParseInt(string(raw), 10, 64)
 	return lit.Int(n), err
 }
-func int2BinDec(raw []byte, _ *lit.Reg) (lit.Val, error) {
+func int2BinDec(raw []byte) (lit.Val, error) {
 	if n := 2; len(raw) != n {
 		return nil, fmt.Errorf("invalid length for int%d: %d", n, len(raw))
 	}
 	return lit.Int(int16(binary.BigEndian.Uint16(raw))), nil
 }
-func int4BinDec(raw []byte, _ *lit.Reg) (lit.Val, error) {
+func int4BinDec(raw []byte) (lit.Val, error) {
 	if n := 4; len(raw) != n {
 		return nil, fmt.Errorf("invalid length for int%d: %d", n, len(raw))
 	}
 	return lit.Int(int32(binary.BigEndian.Uint32(raw))), nil
 }
-func int8BinDec(raw []byte, _ *lit.Reg) (lit.Val, error) {
+func int8BinDec(raw []byte) (lit.Val, error) {
 	if n := 8; len(raw) != n {
 		return nil, fmt.Errorf("invalid length for int%d: %d", n, len(raw))
 	}
 	return lit.Int(binary.BigEndian.Uint64(raw)), nil
 }
 
-func realTextDec(raw []byte, _ *lit.Reg) (lit.Val, error) {
+func realTextDec(raw []byte) (lit.Val, error) {
 	n, err := strconv.ParseFloat(string(raw), 64)
 	return lit.Real(n), err
 }
-func real4BinDec(raw []byte, _ *lit.Reg) (lit.Val, error) {
+func real4BinDec(raw []byte) (lit.Val, error) {
 	if n := 4; len(raw) != n {
 		return nil, fmt.Errorf("invalid length for float%d: %d", n, len(raw))
 	}
 	d := binary.BigEndian.Uint32(raw)
 	return lit.Real(math.Float32frombits(d)), nil
 }
-func real8BinDec(raw []byte, _ *lit.Reg) (lit.Val, error) {
+func real8BinDec(raw []byte) (lit.Val, error) {
 	if n := 8; len(raw) != n {
 		return nil, fmt.Errorf("invalid length for float%d: %d", n, len(raw))
 	}
@@ -165,15 +165,15 @@ func real8BinDec(raw []byte, _ *lit.Reg) (lit.Val, error) {
 	return lit.Real(math.Float64frombits(d)), nil
 }
 
-func strDec(raw []byte, _ *lit.Reg) (lit.Val, error) {
+func strDec(raw []byte) (lit.Val, error) {
 	return lit.Str(raw), nil
 }
 
-func uuidTextDec(raw []byte, _ *lit.Reg) (lit.Val, error) {
+func uuidTextDec(raw []byte) (lit.Val, error) {
 	u, err := cor.ParseUUID(string(raw))
 	return lit.UUID(u), err
 }
-func uuidBinDec(raw []byte, _ *lit.Reg) (lit.Val, error) {
+func uuidBinDec(raw []byte) (lit.Val, error) {
 	if n := 16; len(raw) != n {
 		return nil, fmt.Errorf("invalid length for uuid: %d", len(raw))
 	}
@@ -182,7 +182,7 @@ func uuidBinDec(raw []byte, _ *lit.Reg) (lit.Val, error) {
 	return u, nil
 }
 
-func dateTextDec(raw []byte, _ *lit.Reg) (lit.Val, error) {
+func dateTextDec(raw []byte) (lit.Val, error) {
 	s := string(raw)
 	switch s {
 	case "infinity", "-infinity":
@@ -191,7 +191,7 @@ func dateTextDec(raw []byte, _ *lit.Reg) (lit.Val, error) {
 	t, err := time.ParseInLocation("2006-01-02", s, time.Local)
 	return lit.Time(t), err
 }
-func dateBinDec(raw []byte, _ *lit.Reg) (lit.Val, error) {
+func dateBinDec(raw []byte) (lit.Val, error) {
 	if n := 4; len(raw) != n {
 		return nil, fmt.Errorf("invalid length for date: %d", len(raw))
 	}
@@ -204,7 +204,7 @@ func dateBinDec(raw []byte, _ *lit.Reg) (lit.Val, error) {
 	return lit.Time(t), nil
 }
 
-func tsTextDec(raw []byte, _ *lit.Reg) (lit.Val, error) {
+func tsTextDec(raw []byte) (lit.Val, error) {
 	s := string(raw)
 	switch s {
 	case "infinity", "-infinity":
@@ -213,7 +213,7 @@ func tsTextDec(raw []byte, _ *lit.Reg) (lit.Val, error) {
 	t, err := time.Parse("2006-01-02 15:04:05.999999999", s)
 	return lit.Time(t.In(time.Local)), err
 }
-func tsBinDec(raw []byte, _ *lit.Reg) (lit.Val, error) {
+func tsBinDec(raw []byte) (lit.Val, error) {
 	if n := 8; len(raw) != n {
 		return nil, fmt.Errorf("invalid length for timestamp: %d", len(raw))
 	}
@@ -230,7 +230,7 @@ func tsBinDec(raw []byte, _ *lit.Reg) (lit.Val, error) {
 	return lit.Time(t), nil
 }
 
-func tstzTextDec(raw []byte, _ *lit.Reg) (lit.Val, error) {
+func tstzTextDec(raw []byte) (lit.Val, error) {
 	s := string(raw)
 	switch s {
 	case "infinity", "-infinity":
@@ -251,7 +251,7 @@ func tstzTextDec(raw []byte, _ *lit.Reg) (lit.Val, error) {
 
 const sUnixToY2k = 946684800
 
-func tstzBinDec(raw []byte, _ *lit.Reg) (lit.Val, error) {
+func tstzBinDec(raw []byte) (lit.Val, error) {
 	if n := 8; len(raw) != n {
 		return nil, fmt.Errorf("invalid length for timestamptz: %d", len(raw))
 	}
@@ -267,7 +267,7 @@ func tstzBinDec(raw []byte, _ *lit.Reg) (lit.Val, error) {
 	return lit.Time(t), nil
 }
 
-func timeTextDec(raw []byte, _ *lit.Reg) (lit.Val, error) {
+func timeTextDec(raw []byte) (lit.Val, error) {
 	if len(raw) < 8 {
 		return nil, fmt.Errorf("invalid length for time %d", len(raw))
 	}
@@ -297,7 +297,7 @@ func timeTextDec(raw []byte, _ *lit.Reg) (lit.Val, error) {
 	}
 	return lit.Span(res + time.Duration(n)*time.Microsecond), nil
 }
-func timeBinDec(raw []byte, _ *lit.Reg) (lit.Val, error) {
+func timeBinDec(raw []byte) (lit.Val, error) {
 	if n := 8; len(raw) != n {
 		return nil, fmt.Errorf("invalid length for time: %d", len(raw))
 	}
@@ -305,7 +305,7 @@ func timeBinDec(raw []byte, _ *lit.Reg) (lit.Val, error) {
 	return lit.Span(res), nil
 }
 
-func intervalTextDec(raw []byte, _ *lit.Reg) (lit.Val, error) {
+func intervalTextDec(raw []byte) (lit.Val, error) {
 	dps := strings.Split(string(raw), " ")
 	var res time.Duration
 	for i := 0; i < len(dps)-1; i += 2 {
@@ -365,7 +365,7 @@ func intervalTextDec(raw []byte, _ *lit.Reg) (lit.Val, error) {
 	}
 	return lit.Span(res), nil
 }
-func intervalBinDec(raw []byte, _ *lit.Reg) (lit.Val, error) {
+func intervalBinDec(raw []byte) (lit.Val, error) {
 	if n := 16; len(raw) != n {
 		return nil, fmt.Errorf("invalid length for interval: %d", len(raw))
 	}
@@ -376,10 +376,10 @@ func intervalBinDec(raw []byte, _ *lit.Reg) (lit.Val, error) {
 	return lit.Span(µ + d + m), nil
 }
 
-func jsonDec(raw []byte, reg *lit.Reg) (lit.Val, error) {
+func jsonDec(raw []byte) (lit.Val, error) {
 	return lit.Read(bytes.NewReader(raw), "json")
 }
-func jsonbDec(raw []byte, reg *lit.Reg) (lit.Val, error) {
+func jsonbDec(raw []byte) (lit.Val, error) {
 	if len(raw) == 0 || raw[0] != 1 {
 		return nil, fmt.Errorf("invalid jsonb version")
 	}
@@ -390,7 +390,7 @@ func arrayDecs(txt, bin Decoder, t typ.Type) DecoderPair {
 	return DecoderPair{arrayTextDec(txt, t), arrayBinDec(bin, t)}
 }
 func arrayTextDec(eldec Decoder, elt typ.Type) Decoder {
-	return func(raw []byte, reg *lit.Reg) (lit.Val, error) {
+	return func(raw []byte) (lit.Val, error) {
 		a, err := parseRawTextArray(raw)
 		if err != nil {
 			return nil, err
@@ -404,7 +404,7 @@ func arrayTextDec(eldec Decoder, elt typ.Type) Decoder {
 				}
 				vals[i] = lit.Null{}
 			} else {
-				val, err := eldec(el.Raw, reg)
+				val, err := eldec(el.Raw)
 				if err != nil {
 					return nil, err
 				}
@@ -415,7 +415,7 @@ func arrayTextDec(eldec Decoder, elt typ.Type) Decoder {
 	}
 }
 func arrayBinDec(eldec Decoder, elt typ.Type) Decoder {
-	return func(raw []byte, reg *lit.Reg) (lit.Val, error) {
+	return func(raw []byte) (lit.Val, error) {
 		var hdr pgtype.ArrayHeader
 		off, err := hdr.DecodeBinary(nil, raw)
 		if err != nil {
@@ -441,7 +441,7 @@ func arrayBinDec(eldec Decoder, elt typ.Type) Decoder {
 			} else {
 				elraw := raw[off : off+size]
 				off += size
-				val, err := eldec(elraw, reg)
+				val, err := eldec(elraw)
 				if err != nil {
 					return nil, err
 				}

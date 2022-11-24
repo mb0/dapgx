@@ -10,9 +10,9 @@ import (
 	"xelf.org/xelf/typ"
 )
 
-func ScanOne(reg *lit.Reg, scal bool, mut lit.Mut, rows pgx.Rows) error {
+func ScanOne(reg lit.Regs, scal bool, mut lit.Mut, rows pgx.Rows) error {
 	if rows.Next() {
-		s, err := NewScanner(reg, scal, rows)
+		s, err := NewScanner(scal, rows)
 		if err != nil {
 			return err
 		}
@@ -29,7 +29,7 @@ func ScanOne(reg *lit.Reg, scal bool, mut lit.Mut, rows pgx.Rows) error {
 	return rows.Err()
 }
 
-func ScanMany(reg *lit.Reg, scal bool, mut lit.Mut, rows pgx.Rows) error {
+func ScanMany(reg lit.Regs, scal bool, mut lit.Mut, rows pgx.Rows) (err error) {
 	a, ok := mut.(lit.Apdr)
 	if !ok {
 		return fmt.Errorf("expect appender result got %T", mut)
@@ -37,12 +37,9 @@ func ScanMany(reg *lit.Reg, scal bool, mut lit.Mut, rows pgx.Rows) error {
 	et := typ.ContEl(mut.Type())
 	var s *Scanner
 	for rows.Next() {
-		el, err := reg.Zero(typ.Deopt(et))
-		if err != nil {
-			return err
-		}
+		el := reg.Zero(typ.Deopt(et))
 		if s == nil {
-			s, err = NewScanner(reg, scal, rows)
+			s, err = NewScanner(scal, rows)
 			if err != nil {
 				return err
 			}
@@ -63,7 +60,6 @@ func ScanMany(reg *lit.Reg, scal bool, mut lit.Mut, rows pgx.Rows) error {
 // alleviate many extra type checks and has better null handling for my use-case.
 type Scanner struct {
 	rows pgx.Rows
-	reg  *lit.Reg
 	scal bool
 	cols []scancol
 }
@@ -73,7 +69,7 @@ type scancol struct {
 	decode Decoder
 }
 
-func NewScanner(reg *lit.Reg, scal bool, rows pgx.Rows) (*Scanner, error) {
+func NewScanner(scal bool, rows pgx.Rows) (*Scanner, error) {
 	fds := rows.FieldDescriptions()
 	if scal && len(fds) != 1 {
 		return nil, fmt.Errorf("unexpected number of scalar fields, got %d", len(fds))
@@ -83,7 +79,7 @@ func NewScanner(reg *lit.Reg, scal bool, rows pgx.Rows) (*Scanner, error) {
 		dec := FieldDecoder(fd.DataTypeOID, fd.Format == pgtype.BinaryFormatCode)
 		cols[i] = scancol{string(fd.Name), dec}
 	}
-	return &Scanner{rows: rows, reg: reg, scal: scal, cols: cols}, nil
+	return &Scanner{rows: rows, scal: scal, cols: cols}, nil
 }
 
 func (s *Scanner) Scan(m lit.Mut) (err error) {
@@ -104,7 +100,7 @@ func (s *Scanner) Scan(m lit.Mut) (err error) {
 		col := s.cols[i]
 		var val lit.Val
 		if raw != nil {
-			val, err = col.decode(raw, s.reg)
+			val, err = col.decode(raw)
 			if err != nil {
 				return err
 			}

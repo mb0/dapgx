@@ -26,7 +26,6 @@ func TestTime(t *testing.T) {
 		same(pgtype.TimestamptzOID, time.Date(2022, 1, 1, 0, 0, 0, 0, time.Local)),
 		same(pgtype.DateOID, time.Date(2022, 1, 1, 0, 0, 0, 0, time.Local)),
 	}
-	reg := &lit.Reg{Cache: &lit.Cache{}}
 	for _, test := range tests {
 		enc, err := FieldEncoder(test.oid, lit.Time(test.time))
 		if err != nil {
@@ -44,12 +43,12 @@ func TestTime(t *testing.T) {
 			continue
 		}
 		decs := FieldDecoders(test.oid)
-		tv, err := decs.Text(txt, reg)
+		tv, err := decs.Text(txt)
 		if err != nil {
 			t.Errorf("decode text %v", err)
 			continue
 		}
-		bv, err := decs.Binary(bin, reg)
+		bv, err := decs.Binary(bin)
 		if err != nil {
 			t.Errorf("decode binary %v", err)
 			continue

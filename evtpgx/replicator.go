@@ -170,7 +170,7 @@ func (p *publisher) queryLocal(ctx context.Context, c dapgx.C) ([]*evt.Trans, er
 	}
 	defer rows.Close()
 	var res []*evt.Trans
-	mut, err := p.Reg.Proxy(&res)
+	mut, err := lit.Proxy(p.Reg, &res)
 	if err != nil {
 		return nil, err
 	}

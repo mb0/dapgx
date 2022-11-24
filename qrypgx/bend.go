@@ -83,11 +83,7 @@ func (b *Backend) execQuery(p *exp.Prog, q *Query) error {
 			return fmt.Errorf("query %s: %w", qs, err)
 		}
 		defer rows.Close()
-		mut, err := p.Reg.Zero(typ.Deopt(q.Res))
-		if err != nil {
-			return fmt.Errorf("query %s: %w", qs, err)
-		}
-
+		mut := p.Reg.Zero(typ.Deopt(q.Res))
 		q.Val = &exp.Lit{Res: q.Res, Val: mut}
 		scan := dapgx.ScanMany
 		if q.Kind&KindMany == 0 {
