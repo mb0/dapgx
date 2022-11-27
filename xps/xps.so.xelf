@@ -1,0 +1,6 @@
+{name:'dapgx' mods:[
+	'daql/dom'
+	'daql/qry'
+	'qrypgx'
+]}
+
