@@ -53,7 +53,7 @@ func WriteVal(b *Writer, t typ.Type, l lit.Val) error {
 	if l.Nil() {
 		return b.Fmt("NULL")
 	}
-	l = l.Value()
+	l = lit.Unwrap(l)
 	if t == typ.Void {
 		t = l.Type()
 	}

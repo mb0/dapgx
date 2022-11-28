@@ -37,7 +37,7 @@ func NewWriter(b bfr.Writer, pr *dom.Project, p *exp.Prog, t Translator) *Writer
 }
 func (w *Writer) Translate(p *exp.Prog, env exp.Env, s *exp.Sym) (string, lit.Val, error) {
 	for i, p := range w.Params {
-		// TODO better way to idetify a reference, maybe in another env
+		// TODO better way to identify a reference, maybe in another env
 		if p.Name == s.Sym {
 			return fmt.Sprintf("$%d", i+1), nil, nil
 		}

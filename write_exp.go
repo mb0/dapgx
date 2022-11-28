@@ -46,7 +46,7 @@ func WriteCall(w *Writer, env exp.Env, e *exp.Call) error {
 	}
 	// dyn and reduce are not supported
 	// TODO let and with might use common table expressions on a higher level
-	return fmt.Errorf("no writer for expression %s", e)
+	return fmt.Errorf("no writer for expression %s %s", key, e)
 }
 
 type callWriter interface {

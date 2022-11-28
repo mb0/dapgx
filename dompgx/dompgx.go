@@ -164,7 +164,7 @@ func (c *litCopySrc) Values() ([]interface{}, error) {
 			c.err = fmt.Errorf("expect proxy got %T", el)
 			return nil, c.err
 		}
-		res = append(res, el.Value())
+		res = append(res, lit.Unwrap(el))
 	}
 	return res, nil
 }
