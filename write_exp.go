@@ -493,7 +493,7 @@ func renderMake(w *Writer, env exp.Env, e *exp.Call) error {
 			for _, el := range tup.Els {
 				vs = append(vs, el.(*exp.Lit).Val)
 			}
-			return writeArray(w, &lit.List{El: typ.ContEl(t), Vals: vs})
+			return writeArray(w, lit.NewList(typ.ContEl(t), vs...))
 		}
 	}
 	ts, err := TypString(t)

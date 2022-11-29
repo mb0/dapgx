@@ -458,11 +458,11 @@ func makeList(elt typ.Type, vals []lit.Val, dims []pgtype.ArrayDimension) *lit.L
 			size := int(dims[d].Length)
 			cur := make([]lit.Val, 0, len(vals)/size)
 			for i := 0; i < len(vals); i += size {
-				cur = append(cur, &lit.List{El: elt, Vals: vals[i : i+size]})
+				cur = append(cur, lit.NewList(elt, vals[i:i+size]...))
 			}
 			vals = cur
 			elt = typ.ListOf(elt)
 		}
 	}
-	return &lit.List{El: elt, Vals: vals}
+	return lit.NewList(elt, vals...)
 }

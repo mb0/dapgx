@@ -93,11 +93,11 @@ func TestQry(t *testing.T) {
 	param := lit.MakeObj(lit.Keyed{
 		{Key: "int1", Val: lit.Int(1)},
 		{Key: "strA", Val: lit.Str("a")},
-		{Key: "list", Val: &lit.List{El: typ.Str, Vals: []lit.Val{
+		{Key: "list", Val: lit.NewList(typ.Str,
 			lit.Str("a"),
 			lit.Str("b"),
 			lit.Str("c"),
-		}}},
+		)},
 	})
 	qry := qry.New(reg, extlib.Std, b)
 	for _, test := range tests {
