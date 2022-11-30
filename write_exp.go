@@ -249,7 +249,7 @@ func renderLen(w *Writer, env exp.Env, e *exp.Call) error {
 	if err != nil {
 		return err
 	}
-	t := fst.Resl()
+	t := typ.Res(fst.Type())
 	switch {
 	case t.Kind&knd.Char != 0:
 		return w.Fmt("octet_length(%s)", str)
@@ -546,7 +546,7 @@ func renderJSON(w *Writer, env exp.Env, e *exp.Call) (err error) {
 }
 
 func writeBool(w *Writer, env exp.Env, not bool, e exp.Exp) error {
-	t := e.Resl()
+	t := typ.Res(e.Type())
 	if t.Kind == knd.Bool {
 		if not {
 			defer w.Prec(PrecNot)()

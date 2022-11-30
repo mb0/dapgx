@@ -50,7 +50,7 @@ func (w *Writer) Translate(p *exp.Prog, env exp.Env, s *exp.Sym) (string, lit.Va
 		if n == "" {
 			n = s.Sym
 		}
-		w.Params = append(w.Params, Param{n, s.Type, l})
+		w.Params = append(w.Params, Param{n, s.Res, l})
 		return fmt.Sprintf("$%d", len(w.Params)), nil, nil
 	}
 	return n, l, err

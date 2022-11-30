@@ -108,7 +108,7 @@ func (e *unresEnv) add(t typ.Type, names ...string) {
 func (e *unresEnv) Parent() exp.Env { return e.Par }
 func (e *unresEnv) Lookup(s *exp.Sym, k string, eval bool) (exp.Exp, error) {
 	if t, ok := e.Map[k]; ok {
-		s.Type = t
+		s.Res = t
 		return s, nil
 	}
 	return e.Par.Lookup(s, k, eval)
