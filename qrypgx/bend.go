@@ -13,7 +13,6 @@ import (
 	"xelf.org/xelf/exp"
 	"xelf.org/xelf/knd"
 	"xelf.org/xelf/lit"
-	"xelf.org/xelf/typ"
 )
 
 type Backend struct {
@@ -83,13 +82,13 @@ func (b *Backend) execQuery(p *exp.Prog, q *Query) error {
 			return fmt.Errorf("query %s: %w", qs, err)
 		}
 		defer rows.Close()
-		mut := p.Reg.Zero(typ.Deopt(q.Res))
-		q.Val = &exp.Lit{Res: q.Res, Val: mut}
+		mut := p.Reg.ZeroWrap(q.Res)
+		q.Val = exp.LitVal(mut)
 		scan := dapgx.ScanMany
 		if q.Kind&KindMany == 0 {
 			scan = dapgx.ScanOne
 		}
-		err = scan(p.Reg, q.Kind&KindScalar != 0, mut, rows)
+		err = scan(p.Reg, q.Kind&KindScalar != 0, lit.Unwrap(mut).Mut(), rows)
 		if err != nil {
 			return fmt.Errorf("query %s: %w", qs, err)
 		}

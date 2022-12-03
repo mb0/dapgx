@@ -47,7 +47,7 @@ func TypString(t typ.Type) (string, error) {
 }
 
 // WriteLit renders the literal l to b or returns an error.
-func WriteLit(b *Writer, l *exp.Lit) error { return WriteVal(b, l.Res, l.Val) }
+func WriteLit(b *Writer, l *exp.Lit) error { return WriteVal(b, typ.Res(l.Type()), l.Val) }
 
 func WriteVal(b *Writer, t typ.Type, l lit.Val) error {
 	if l.Nil() {

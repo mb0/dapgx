@@ -63,7 +63,7 @@ type Translator interface {
 type ExpEnv struct{}
 
 func (ee ExpEnv) Translate(p *exp.Prog, env exp.Env, s *exp.Sym) (n string, v lit.Val, err error) {
-	x, err := env.Lookup(s, s.Sym, true)
+	v, err = env.Lookup(s, s.Sym, true)
 	if err != nil {
 		return "", nil, err
 	}
@@ -73,9 +73,6 @@ func (ee ExpEnv) Translate(p *exp.Prog, env exp.Env, s *exp.Sym) (n string, v li
 	}
 	if cor.IsKey(n) {
 		return n, nil, nil
-	}
-	if l := x.(*exp.Lit); l != nil {
-		v = l.Val
 	}
 	return s.Sym, v, External
 }
