@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"xelf.org/xelf/cor"
 	"xelf.org/xelf/exp"
 	"xelf.org/xelf/lib"
 	"xelf.org/xelf/lit"
@@ -107,10 +108,10 @@ func (e *unresEnv) add(t typ.Type, names ...string) {
 	}
 }
 func (e *unresEnv) Parent() exp.Env { return e.Par }
-func (e *unresEnv) Lookup(s *exp.Sym, k string, eval bool) (lit.Val, error) {
-	if t, ok := e.Map[k]; ok {
+func (e *unresEnv) Lookup(s *exp.Sym, p cor.Path, eval bool) (lit.Val, error) {
+	if t, ok := e.Map[p.Plain()]; ok {
 		s.Res = t
 		return nil, nil
 	}
-	return e.Par.Lookup(s, k, eval)
+	return e.Par.Lookup(s, p, eval)
 }

@@ -125,13 +125,11 @@ func (jt *jobTranslator) Translate(p *exp.Prog, env exp.Env, s *exp.Sym) (string
 	if j == nil {
 		return dapgx.ExpEnv{}.Translate(p, env, s)
 	}
-	n := s.Rel[1:]
-	sp := strings.SplitN(n, ".", 2)
-	if len(sp) == 1 {
+	if f := s.Path[0]; f.Sep() == '.' && f.Key != "" {
 		// TODO only check if inline or joined query
-		f, _ := j.Field(sp[0])
+		f, _ := j.Field(f.Key)
 		for f != nil {
-			return jt.ColRef(j, n), nil, nil
+			return jt.ColRef(j, f.Key), nil, nil
 		}
 	}
 	return "", nil, fmt.Errorf("no selection for %q", s.Sym)

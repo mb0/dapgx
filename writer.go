@@ -63,7 +63,12 @@ type Translator interface {
 type ExpEnv struct{}
 
 func (ee ExpEnv) Translate(p *exp.Prog, env exp.Env, s *exp.Sym) (n string, v lit.Val, err error) {
-	v, err = env.Lookup(s, s.Sym, true)
+	path, err := cor.ParsePath(s.Sym)
+	if err != nil {
+		return n, v, err
+	}
+	s.Update(s.Res, env, path)
+	v, err = s.Env.Lookup(s, s.Path, true)
 	if err != nil {
 		return "", nil, err
 	}

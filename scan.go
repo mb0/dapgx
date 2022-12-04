@@ -30,7 +30,7 @@ func ScanOne(reg lit.Regs, scal bool, mut lit.Mut, rows pgx.Rows) error {
 }
 
 func ScanMany(reg lit.Regs, scal bool, mut lit.Mut, rows pgx.Rows) (err error) {
-	a, ok := mut.(lit.Apdr)
+	a, ok := mut.(lit.Appender)
 	if !ok {
 		return fmt.Errorf("expect appender result got %T", mut)
 	}
