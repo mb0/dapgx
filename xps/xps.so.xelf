@@ -2,5 +2,8 @@
 	'daql/dom'
 	'daql/qry'
 	'qrypgx'
-]}
+], cmds:{
+	'':'Dapgx daql backend commands'
+	gen:'Generates PostgreSQL schema definitions.'
+}}
 

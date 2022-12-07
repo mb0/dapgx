@@ -125,7 +125,7 @@ func (jt *jobTranslator) Translate(p *exp.Prog, env exp.Env, s *exp.Sym) (string
 	if j == nil {
 		return dapgx.ExpEnv{}.Translate(p, env, s)
 	}
-	if f := s.Path[0]; f.Sep() == '.' && f.Key != "" {
+	if f := s.Path.Fst(); f.Sep() == '.' && f.Key != "" {
 		// TODO only check if inline or joined query
 		f, _ := j.Field(f.Key)
 		for f != nil {
