@@ -8,22 +8,18 @@ import (
 	"xelf.org/dapgx/dompgx"
 	_ "xelf.org/dapgx/evtpgx"
 	_ "xelf.org/dapgx/qrypgx"
+	"xelf.org/daql"
 	"xelf.org/daql/gen"
-	"xelf.org/daql/xps/cmd"
+	"xelf.org/xelf/xps"
 )
 
-func Cmd(dir string, args []string) error {
-	_, args = split(args)
-	fst, args := split(args)
-	switch fst {
-	case "gen":
-		return genPg(dir, args)
+func Cmd(ctx *xps.CmdCtx) error {
+	switch ctx.Split() {
+	case "", "gen":
+	default:
+		return nil
 	}
-	return nil
-
-}
-func genPg(dir string, args []string) error {
-	pr, ss, err := cmd.LoadProjectSchemas(dir, args)
+	pr, ss, err := daql.LoadProjectSchemas(ctx.Dir, ctx.Args)
 	if err != nil {
 		return err
 	}
@@ -43,11 +39,4 @@ func genPg(dir string, args []string) error {
 	}
 	w.WriteString("COMMIT;\n")
 	return b.Flush()
-}
-
-func split(args []string) (string, []string) {
-	if len(args) > 0 {
-		return args[0], args[1:]
-	}
-	return "", nil
 }

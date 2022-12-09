@@ -1,9 +1,9 @@
-{name:'dapgx' mods:[
-	'daql/dom'
-	'daql/qry'
-	'qrypgx'
-], cmds:{
-	'':'Dapgx daql backend commands'
-	gen:'Generates PostgreSQL schema definitions.'
+{name:'dapgx' caps:{
+	mods:['qrypgx']
+	cmds:{
+		'':'Dapgx daql backend commands'
+		gen:'Generates PostgreSQL schema definitions.'
+	}
+	gen:['postgres' 'postgresql']
+	bend:['postgres' 'postgresql']
 }}
-
