@@ -10,7 +10,7 @@ import (
 	"xelf.org/xelf/mod"
 )
 
-var Prov = qry.RegisterProvider(&provider{}, "postgres", "postgresql", "qrypgx")
+var Prov = qry.Backends.Register(&provider{}, "postgres", "postgresql", "qrypgx")
 
 type provider struct{ pools sync.Map }
 
