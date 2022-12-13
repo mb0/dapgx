@@ -12,6 +12,7 @@ import (
 	"xelf.org/daql/dom/domtest"
 	"xelf.org/daql/qry"
 	"xelf.org/xelf/bfr"
+	"xelf.org/xelf/exp"
 	"xelf.org/xelf/lib/extlib"
 	"xelf.org/xelf/lit"
 	"xelf.org/xelf/typ"
@@ -99,10 +100,10 @@ func TestQry(t *testing.T) {
 			lit.Str("c"),
 		)},
 	})
-	qry := qry.New(reg, extlib.Std, b)
+
 	for _, test := range tests {
 		start := time.Now()
-		el, err := qry.Exec(ctx, test.Raw, param)
+		el, err := exp.NewProg(qry.NewDoc(extlib.Std, b)).RunStr(test.Raw, param)
 		end := time.Now()
 		if err != nil {
 			t.Errorf("qry %s error %+v", test.Raw, err)

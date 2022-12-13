@@ -82,16 +82,15 @@ func TestGenQuery(t *testing.T) {
 			`WHERE p.id = 1 AND c1.id = p.cat LIMIT 1`,
 		}},
 	}
-	q := qry.New(reg, extlib.Std, b)
 	for _, test := range tests {
 		ast, err := exp.Parse(test.raw)
 		if err != nil {
 			t.Errorf("parse %s error: %v", test.raw, err)
 			continue
 		}
-		d := &qry.Doc{Qry: q}
-		c := exp.NewProg(d, reg)
-		_, err = c.Resl(c, ast, typ.Void)
+		d := qry.NewDoc(extlib.Std, b)
+		p := exp.NewProg(d)
+		_, err = p.Resl(p, ast, typ.Void)
 		if err != nil {
 			t.Errorf("resolve %s error %+v", test.raw, err)
 			continue
@@ -103,7 +102,7 @@ func TestGenQuery(t *testing.T) {
 		}
 		var res []string
 		for _, q := range batch.List {
-			qs, _, err := genQuery(b.Project, c, q)
+			qs, _, err := genQuery(b.Project, p, q)
 			if err != nil {
 				t.Errorf("gen queries %s: %v", test.raw, err)
 				continue
