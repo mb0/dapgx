@@ -38,7 +38,7 @@ func TestRender(t *testing.T) {
 		{`(in x [1 2 3] [4 5])`, `x IN (1, 2, 3) OR x IN (4, 5)`},
 		{`(in x t [4 5])`, `x = ANY(t) OR x IN (4, 5)`},
 		{`(ni x t [4 5])`, `x != ALL(t) AND x NOT IN (4, 5)`},
-		{`('hell' 'o W' 'orld')`, `CONCAT('hell', 'o W', 'orld')`},
+		{`(cat 'hell' 'o W' 'orld')`, `CONCAT('hell', 'o W', 'orld')`},
 		{`(sep ' | ' 'hell' 'o W' 'orld')`, `CONCAT('hell', ' | ', 'o W', ' | ', 'orld')`},
 		{`(equal x 1)`, `(x = 1 AND pg_typeof(x) = pg_typeof(1))`},
 		{`(gt x y 1)`, `x > y AND y > 1`},

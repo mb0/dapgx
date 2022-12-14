@@ -58,7 +58,7 @@ func TestQry(t *testing.T) {
 	}{
 		{`(#prod.cat)`, `7`},
 		{`(#prod.prod)`, `6`},
-		{`([] (#prod.cat) (#prod.prod))`, `[7 6]`},
+		{`([]+ (#prod.cat) (#prod.prod))`, `[7 6]`},
 		{`({} cats:(#prod.cat) prods:(#prod.prod))`, `{cats:7 prods:6}`},
 		{`(#prod.cat off:5 lim:5)`, `2`},
 		{`(#prod.prod (eq .cat $int1))`, `2`},
@@ -77,7 +77,7 @@ func TestQry(t *testing.T) {
 		{`(*prod.cat lim:2)`, `[{id:25 name:'y'} {id:2 name:'b'}]`},
 		{`(*prod.cat asc:name off:1 lim:2)`, `[{id:2 name:'b'} {id:3 name:'c'}]`},
 		{`(*prod.cat desc:name lim:2)`, `[{id:26 name:'z'} {id:25 name:'y'}]`},
-		{`(?prod.label _ id; label:('Label: ' .name))`, `{id:1 label:'Label: M'}`},
+		{`(?prod.label _ id; label:(cat 'Label: ' .name))`, `{id:1 label:'Label: M'}`},
 		{`(*prod.label off:1 lim:2 - tmpl;)`, `[{id:2 name:'N'} {id:3 name:'O'}]`},
 		{`(*prod.prod desc:cat asc:name lim:3)`,
 			`[{id:1 name:'A' cat:3} {id:3 name:'C' cat:3} {id:2 name:'B' cat:2}]`},
