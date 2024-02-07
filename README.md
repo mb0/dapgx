@@ -1,7 +1,7 @@
 dapgx
 =====
 
-dapgx provides a PostgreSQL backends for the daql project.
+dapgx provides PostgreSQL backends for the daql project.
 
 This project implements a custom set of decoder and encoders for xelf literals.
 
