@@ -90,6 +90,8 @@ func TestQry(t *testing.T) {
 			`{id:3 name:'c' prods:[{id:1 name:'A'} {id:3 name:'C'}]}]`},
 		{`(*prod.prod (ge .id 25) + catn:(?prod.cat (eq .id ..cat) _:name))`,
 			`[{id:25 name:'Y' cat:1 catn:'a'} {id:26 name:'Z' cat:1 catn:'a'}]`},
+		{`(*prod.prod (ge .id 25) + catn:.cat.name)`,
+			`[{id:25 name:'Y' cat:1 catn:'a'} {id:26 name:'Z' cat:1 catn:'a'}]`},
 	}
 	param := lit.MakeObj(lit.Keyed{
 		{Key: "int1", Val: lit.Int(1)},
@@ -118,5 +120,39 @@ func TestQry(t *testing.T) {
 			continue
 		}
 		log.Printf("test took %s", end.Sub(start))
+	}
+	tests = []struct {
+		Raw  string
+		Want string
+	}{
+		{`(#prod.cat)`, `<int>`},
+		{`([]+ (#prod.cat) (#prod.prod))`, `<idxr>`},
+		{`({} cats:(#prod.cat) prods:(#prod.prod))`, `<keyr>`},
+		{`(list|int + (#prod.cat) (#prod.prod))`, `<list|int>`},
+		{`(dict|int cats:(#prod.cat) prods:(#prod.prod))`, `<dict|int>`},
+		{`(?prod.cat)`, `<obj@prod.Cat?>`},
+		{`(?$list)`, `<str?>`},
+		{`(?prod.cat _ id;)`, `<obj? ID:int@prod.Cat.ID>`},
+		{`(*prod.cat _ id)`, `<list|obj ID:int@prod.Cat.ID>`},
+		{`(?prod.cat _:id)`, `<int@prod.Cat.ID?>`},
+		{`(*prod.cat _:id)`, `<list|int@prod.Cat.ID>`},
+		{`(*prod.cat lim:2)`, `<list|obj@prod.Cat>`},
+		{`(?prod.label _ id; label:(cat 'Label: ' .name))`,
+			`<obj? ID:int@prod.Label.ID Label:str>`},
+	}
+	for _, test := range tests {
+		el, err := exp.NewProg(qry.NewDoc(extlib.Std, b)).RunStr(test.Raw, param)
+		if err != nil {
+			t.Errorf("qry %s failed: %v", test.Raw, err)
+			continue
+		}
+		if el == nil {
+			t.Errorf("qry %s got nil result", test.Raw)
+			continue
+		}
+		if got := bfr.String(el.Type()); got != test.Want {
+			t.Errorf("want for %s\n\t%s got %s", test.Raw, test.Want, got)
+			continue
+		}
 	}
 }
